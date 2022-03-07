@@ -4,8 +4,6 @@
 #
 #
 ############################################################################################
-# length_one_axis(::Base.OneTo) = Base.OneTo(1)
-# length_one_axis(::Any) = 1:1
 using Polyester
 using LoopVectorization
 import LoopVectorization.length_one_axis
@@ -222,6 +220,8 @@ for (name, f1, fdims) ∈ zip((:vargmax, :vargmin), (:_vargmax, :_vargmin), (:_v
         end
         $fdims(out, Rpre, 1:size(A, dims), Rpost, A)
     end
+    @eval $name(A, ::Colon) = $name(A)
+    # @eval $name(A; dims::Colon) = $name(A)
     # A neat idea, but poor performance due to much memory allocation
     # @eval function $name(A::AbstractArray, region::NTuple{N, Int}) where {N}
     #     if N == 1
@@ -299,6 +299,7 @@ for (name, f1, fdims) ∈ zip((:vtargmax, :vtargmin), (:_vtargmax, :_vtargmin), 
         end
         $fdims(out, Rpre, 1:size(A, dims), Rpost, A)
     end
+    @eval $name(A, ::Colon) = $name(A)
 end
 for (op, name, init) ∈ zip((:>, :<), (:_vargmax_prepost!, :_vargmin_prepost!), (:typemin, :typemax))
     @eval function $name(out, Ipre, is, Ipost, A)

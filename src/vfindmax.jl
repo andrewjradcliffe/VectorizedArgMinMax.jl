@@ -24,6 +24,7 @@ for (name, f1, fdims) ∈ zip((:vfindmax, :vfindmin), (:_vfindmax, :_vfindmin), 
         end
         $fdims(Vout, Iout, Rpre, 1:size(A, dims), Rpost, A)
     end
+    @eval $name(A, ::Colon) = $name(A)
 end
 for (op, name, init) ∈ zip((:>, :<), (:_vfindmax_dims!, :_vfindmin_dims!), (:typemin, :typemax))
     @eval function $name(Vout, Iout, Rpre, is, Rpost, A)
@@ -85,6 +86,7 @@ for (name, f1, fdims) ∈ zip((:vtfindmax, :vtfindmin), (:_vtfindmax, :_vtfindmi
         end
         $fdims(Vout, Iout, Rpre, 1:size(A, dims), Rpost, A)
     end
+    @eval $name(A, ::Colon) = $name(A)
 end
 for (op, name, init) ∈ zip((:>, :<), (:_vfindmax_prepost!, :_vfindmin_prepost!), (:typemin, :typemax))
     @eval function $name(Vout, Iout, Ipre, is, Ipost, A)
