@@ -64,7 +64,8 @@ function lvreduce(f, A::AbstractArray{T, N}, dims::NTuple{M, Int}) where {T, N, 
     Dᴬ = size(A)
     Dᴮ = ntuple(d -> d ∈ dims ? 1 : Dᴬ[d], N)
     B = zeros(Base.promote_op(f, T), Dᴮ)
-    Dᴮ′ = ntuple(d -> StaticInt(Dᴮ[d]), N)
+    # Dᴮ′ = ntuple(d -> StaticInt(Dᴮ[d]), N)
+    Dᴮ′ = ntuple(d -> d ∈ dims ? StaticInt(1) : Dᴮ[d], N)
     _lvreduce!(f, B, A, Dᴮ′)
     B
 end
@@ -100,7 +101,8 @@ for (op, init) ∈ zip((:+, :-, :*, :max, :min), (:zero, :zero, :one, :typemin, 
         Dᴬ = size(A)
         Dᴮ = ntuple(d -> d ∈ dims ? 1 : Dᴬ[d], N)
         B = fill($init(T), Dᴮ)
-        Dᴮ′ = ntuple(d -> StaticInt(Dᴮ[d]), N)
+        # Dᴮ′ = ntuple(d -> StaticInt(Dᴮ[d]), N)
+        Dᴮ′ = ntuple(d -> d ∈ dims ? StaticInt(1) : Dᴮ[d], N)
         _lvreduce!($op, B, A, Dᴮ′)
         B
     end
@@ -143,7 +145,8 @@ function lvmapreduce(f, op, A::AbstractArray{T, N}, dims::NTuple{M, Int}) where 
     Dᴬ = size(A)
     Dᴮ = ntuple(d -> d ∈ dims ? 1 : Dᴬ[d], N)
     B = zeros(Base.promote_op(f, T), Dᴮ)
-    Dᴮ′ = ntuple(d -> StaticInt(Dᴮ[d]), N)
+    # Dᴮ′ = ntuple(d -> StaticInt(Dᴮ[d]), N)
+    Dᴮ′ = ntuple(d -> d ∈ dims ? StaticInt(1) : Dᴮ[d], N)
     _lvmapreduce!(f, op, B, A, Dᴮ′)
     B
 end
@@ -181,7 +184,8 @@ for (op, init) ∈ zip((:+, :-, :*, :max, :min), (:zero, :zero, :one, :typemin, 
         Dᴬ = size(A)
         Dᴮ = ntuple(d -> d ∈ dims ? 1 : Dᴬ[d], N)
         B = fill($init(T), Dᴮ)
-        Dᴮ′ = ntuple(d -> StaticInt(Dᴮ[d]), N)
+        # Dᴮ′ = ntuple(d -> StaticInt(Dᴮ[d]), N)
+        Dᴮ′ = ntuple(d -> d ∈ dims ? StaticInt(1) : Dᴮ[d], N)
         _lvmapreduce!(f, $op, B, A, Dᴮ′)
         B
     end
@@ -222,7 +226,8 @@ function lvtreduce(f, A::AbstractArray{T, N}, dims::NTuple{M, Int}) where {T, N,
     Dᴬ = size(A)
     Dᴮ = ntuple(d -> d ∈ dims ? 1 : Dᴬ[d], N)
     B = zeros(Base.promote_op(f, T), Dᴮ)
-    Dᴮ′ = ntuple(d -> StaticInt(Dᴮ[d]), N)
+    # Dᴮ′ = ntuple(d -> StaticInt(Dᴮ[d]), N)
+    Dᴮ′ = ntuple(d -> d ∈ dims ? StaticInt(1) : Dᴮ[d], N)
     _lvtreduce!(f, B, A, Dᴮ′)
     B
 end
@@ -257,7 +262,8 @@ for (op, init) ∈ zip((:+, :-, :*, :max, :min), (:zero, :zero, :one, :typemin, 
         Dᴬ = size(A)
         Dᴮ = ntuple(d -> d ∈ dims ? 1 : Dᴬ[d], N)
         B = fill($init(T), Dᴮ)
-        Dᴮ′ = ntuple(d -> StaticInt(Dᴮ[d]), N)
+        # Dᴮ′ = ntuple(d -> StaticInt(Dᴮ[d]), N)
+        Dᴮ′ = ntuple(d -> d ∈ dims ? StaticInt(1) : Dᴮ[d], N)
         _lvtreduce!($op, B, A, Dᴮ′)
         B
     end
@@ -300,7 +306,8 @@ function lvtmapreduce(f, op, A::AbstractArray{T, N}, dims::NTuple{M, Int}) where
     Dᴬ = size(A)
     Dᴮ = ntuple(d -> d ∈ dims ? 1 : Dᴬ[d], N)
     B = zeros(Base.promote_op(f, T), Dᴮ)
-    Dᴮ′ = ntuple(d -> StaticInt(Dᴮ[d]), N)
+    # Dᴮ′ = ntuple(d -> StaticInt(Dᴮ[d]), N)
+    Dᴮ′ = ntuple(d -> d ∈ dims ? StaticInt(1) : Dᴮ[d], N)
     _lvtmapreduce!(f, op, B, A, Dᴮ′)
     B
 end
@@ -337,7 +344,8 @@ for (op, init) ∈ zip((:+, :-, :*, :max, :min), (:zero, :zero, :one, :typemin, 
         Dᴬ = size(A)
         Dᴮ = ntuple(d -> d ∈ dims ? 1 : Dᴬ[d], N)
         B = fill($init(T), Dᴮ)
-        Dᴮ′ = ntuple(d -> StaticInt(Dᴮ[d]), N)
+        # Dᴮ′ = ntuple(d -> StaticInt(Dᴮ[d]), N)
+        Dᴮ′ = ntuple(d -> d ∈ dims ? StaticInt(1) : Dᴮ[d], N)
         _lvtmapreduce!(f, $op, B, A, Dᴮ′)
         B
     end
