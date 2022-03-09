@@ -99,13 +99,19 @@ end
 # _vvreduce!(+, B, A, preparedims(B, A))
 function branches_quote(F, N::Int, D)
     e = Expr(:ref, :B, ntuple(d -> D.parameters[d] !== StaticInt{1} ? Symbol(:i_, d) : :(1), N)...)
+    # or:
+    # e = Expr(:ref, :B)
+    # params = D.parameters
+    # for d ∈ 1:N
+    #     push!(e.args, params[d] !== StaticInt{1} ? Symbol(:i_, d) : :(1))
+    # end
     ex = :(@nloops $N i A begin
                $e = $(F.instance)($e, (@nref $N A i))
            end)
     exm = macroexpand(Main, ex)
     loops = exm.args[2]
     return quote
-        @tturbo $loops
+        @turbo $loops
         return B
     end
 end
@@ -113,17 +119,21 @@ end
     branches_quote(F, N, D)
 end
 function vvvreduce(f, A::AbstractArray{T}; dims::NTuple{N, Int}) where {N} where {T}
-    Db = prepare(A, dims)
-    # B = similar(A, Db)
-    # fill!(B, 0.0)
-    B = zeros(T, Db)
-    vvvreduce!(f, B, A, preparedims(B, A))
+    if N == ndims(A)
+        cat(_vvvreduce(f, A); dims=N)
+    else
+        Db = prepare(A, dims)
+        # B = similar(A, Db)
+        # fill!(B, 0.0)
+        B = zeros(T, Db)
+        vvvreduce!(f, B, A, preparedims(B, A))
+    end
 end
-
-@generated function vvvreduce(f::F, A::AbstractArray{T, N}) where {F, T, N}
+# vvvreduce(f, A::AbstractArray{T}; dims::Int) where {T} = vvvreduce(f, A; dims=(dims,))
+@generated function _vvvreduce(f::F, A::AbstractArray{T, N}) where {F, T, N}
     quote
         s = zero($T)
-        @tturbo for i ∈ eachindex(A)
+        @turbo for i ∈ eachindex(A)
             s = $(F.instance)(s, A[i])
         end
         return s
@@ -141,10 +151,14 @@ A = rand(4,3,5);
 @timev vvvreduce(+, A, dims=(1,))
 # This causes an error -- however, one can actually perform this faster by just
 # reducing using a scalar, then doing cat(s, dims=N).
-B = zeros(Float64, prepare(A, (1,2,3)))
-branches_quote(typeof(+), 3, typeof(preparedims(B, A)))
+B = zeros(Float64, prepare(A, (1,)))
+tp = typeof(+)
+DD = typeof(preparedims(B, A))
+@timev branches_quote(tp, 3, DD)
+@timev branches_quote2(tp, 3, DD)
 eval(ans)
-@timev sum(A, dims=(1,))
+@timev sum(A, dims=(5,));
+@timev vvvreduce(+, A, dims=(5,));
 
 
 
