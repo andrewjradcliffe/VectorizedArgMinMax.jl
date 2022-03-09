@@ -186,7 +186,7 @@ push!(ls.args, body)
 function reduce_quote(f, A::AbstractArray{T, N}, dims::NTuple{M, Int}) where {T, N, M}
     Dᴬ = size(A)
     Dᴮ = ntuple(d -> d ∈ dims ? 1 : Dᴬ[d], N)
-    # B = similar(A, Base.promote_op(f, T), Dᴮ)
+    B = similar(A, Base.promote_op(f, T), Dᴮ)
     ls = loopgen(A)
     body = reducebody(f, B, A)
     push!(ls.args, body)
@@ -236,12 +236,12 @@ function reduce_quote(F, N::Int, D)
     # end
     ls
 end
-function mapreduce_quote(F, O, N::Int, D)
+function mapreduce_quote(F, OP, N::Int, D)
     ls = loopgen(N)
     body = Expr(:block)
     params = D.parameters
     f = F.instance
-    op = O.instance
+    op = OP.instance
     a = Expr(:ref, :A, ntuple(d -> Symbol(:i_, d), N)...)
     b = Expr(:ref, :B, ntuple(d -> params[d] == Static.One ? 1 : Symbol(:i_, d), N)...)
     e = Expr(:(=), b, Expr(:call, Symbol(op), b, Expr(:call, Symbol(f), a)))
@@ -279,8 +279,8 @@ function mapmreduce(f, op, A::AbstractArray{T, N}, dims::NTuple{M, Int}) where {
     B
 end
 
-@generated function _mapmreduce!(f::F, op::O, B::AbstractArray{T, N}, A::AbstractArray{T, N}, dims::D) where {F, O, T, N, D}
-    mapreduce_quote(F, O, N, D)
+@generated function _mapmreduce!(f::F, op::OP, B::AbstractArray{T, N}, A::AbstractArray{T, N}, dims::D) where {F, OP, T, N, D}
+    mapreduce_quote(F, OP, N, D)
 end
 
 A = rand(1000, 1000, 1000);
@@ -296,9 +296,9 @@ mreduce(|, A, (1,))
 reduce(|, A, dims=(1,), init=0)
 m2reduce(+, A, (1,))
 m2treduce(+, A, (1,))
-mapmreduce(cos, +, A, (1,))
+mapmreduce(abs2, +, A, (1,))
 mapreduce(abs2, +, A, dims=(1,))
-mapm2reduce(cos, +, A, (1,))
+mapm2reduce(abs2, +, A, (1,))
 mapm2treduce(abs2, +, A, (1,))
 
 
@@ -357,12 +357,12 @@ end
 end
 
 
-function mapm2reduce_quote(F, O, N::Int, D)
+function mapm2reduce_quote(F, OP, N::Int, D)
     ls = loopgen(N)
     body = Expr(:block)
     params = D.parameters
     f = F.instance
-    op = O.instance
+    op = OP.instance
     a = Expr(:ref, :A, ntuple(d -> Symbol(:i_, d), N)...)
     b = Expr(:ref, :B, ntuple(d -> params[d] == Static.One ? 1 : Symbol(:i_, d), N)...)
     e = Expr(:(=), b, Expr(:call, Symbol(op), b, Expr(:call, Symbol(f), a)))
@@ -382,16 +382,16 @@ function mapm2reduce(f, op, A::AbstractArray{T, N}, dims::NTuple{M, Int}) where 
     B
 end
 
-@generated function _mapm2reduce!(f::F, op::O, B::AbstractArray{T, N}, A::AbstractArray{T, N}, dims::D) where {F, O, T, N, D}
-    mapm2reduce_quote(F, O, N, D)
+@generated function _mapm2reduce!(f::F, op::OP, B::AbstractArray{T, N}, A::AbstractArray{T, N}, dims::D) where {F, OP, T, N, D}
+    mapm2reduce_quote(F, OP, N, D)
 end
 
-function mapm2treduce_quote(F, O, N::Int, D)
+function mapm2treduce_quote(F, OP, N::Int, D)
     ls = loopgen(N)
     body = Expr(:block)
     params = D.parameters
     f = F.instance
-    op = O.instance
+    op = OP.instance
     a = Expr(:ref, :A, ntuple(d -> Symbol(:i_, d), N)...)
     b = Expr(:ref, :B, ntuple(d -> params[d] == Static.One ? 1 : Symbol(:i_, d), N)...)
     e = Expr(:(=), b, Expr(:call, Symbol(op), b, Expr(:call, Symbol(f), a)))
@@ -411,6 +411,6 @@ function mapm2treduce(f, op, A::AbstractArray{T, N}, dims::NTuple{M, Int}) where
     B
 end
 
-@generated function _mapm2treduce!(f::F, op::O, B::AbstractArray{T, N}, A::AbstractArray{T, N}, dims::D) where {F, O, T, N, D}
-    mapm2treduce_quote(F, O, N, D)
+@generated function _mapm2treduce!(f::F, op::OP, B::AbstractArray{T, N}, A::AbstractArray{T, N}, dims::D) where {F, OP, T, N, D}
+    mapm2treduce_quote(F, OP, N, D)
 end
