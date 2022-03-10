@@ -94,3 +94,71 @@ lvmean(f, A::AbstractArray{T, N}, ::Colon) where {T, N} = lvmean1(f, A)
         s / length(A)
     end
 end
+
+################ threaded version
+
+function tsmul!(A::AbstractArray{T, N}, x::T) where {T, N}
+    @tturbo for i ∈ eachindex(A)
+        A[i] *= x
+    end
+    A
+end
+
+function tsmul!(B::AbstractArray{Tₒ, N}, A::AbstractArray{T, N}, x::Tₒ) where {Tₒ, T, N}
+    @tturbo for i ∈ eachindex(A)
+        B[i] = A[i] * x
+    end
+    B
+end
+tsmul(A::AbstractArray{T, N}, x::Tₒ) where {Tₒ, T, N} = tsmul!(similar(A, Tₒ), A, x)
+
+function lvtmean(A::AbstractArray{T, N}, dims::NTuple{M, Int}) where {T, N, M}
+    B = lvtsum(A, dims=dims)
+    Dᴬ = size(A)
+    denom = 1
+    for d ∈ eachindex(Dᴬ)
+        denom = d ∈ dims ? denom * Dᴬ[d] : denom
+    end
+    x = inv(denom)
+    return eltype(B) <: AbstractFloat ? smul!(B, x) : smul(B, x)
+end
+lvtmean(A::AbstractArray{T, N}, dims::Int) where {T, N} = lvtmean(A, (dims,))
+lvtmean(A::AbstractArray{T, N}; dims=:) where {T, N} = lvtmean(A, dims)
+lvtmean(A::AbstractArray{T, N}) where {T, N} = lvtmean1(A)
+lvtmean(A::AbstractArray{T, N}, ::Colon) where {T, N} = lvtmean1(A)
+
+function lvtmean1(A::AbstractArray{T, N}) where {T, N}
+    s = zero(Base.promote_op(+, T, Int))
+    @tturbo for i ∈ eachindex(A)
+        s += A[i]
+    end
+    s / length(A)
+end
+
+################
+function lvtmean(f, A::AbstractArray{T, N}, dims::NTuple{M, Int}) where {T, N, M}
+    B = lvtsum(f, A, dims=dims)
+    Dᴬ = size(A)
+    denom = 1
+    for d ∈ eachindex(Dᴬ)
+        denom = d ∈ dims ? denom * Dᴬ[d] : denom
+    end
+    x = inv(denom)
+    return eltype(B) <: AbstractFloat ? smul!(B, x) : smul(B, x)
+end
+lvtmean(f, A::AbstractArray{T, N}, dims::Int) where {T, N} = lvtmean(f, A, (dims,))
+lvtmean(f, A::AbstractArray{T, N}; dims=:) where {T, N} = lvtmean(f, A, dims)
+lvtmean(f, A::AbstractArray{T, N}) where {T, N} = lvtmean1(f, A)
+lvtmean(f, A::AbstractArray{T, N}, ::Colon) where {T, N} = lvtmean1(f, A)
+
+@generated function lvtmean1(f::F, A::AbstractArray{T, N}) where {F, T, N}
+    f = F.instance
+    Tₒ = Base.promote_op(+, Base.promote_op(f, T), Int)
+    quote
+        s = zero($Tₒ)
+        @tturbo for i ∈ eachindex(A)
+            s += $f(A[i])
+        end
+        s / length(A)
+    end
+end
