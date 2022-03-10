@@ -26,11 +26,11 @@ function aminusb_exp_sum_quote(N::Int, D)
     end
 end
 
-@generated function aminusb_exp_sum!(C::AbstractArray{T, N}, A::AbstractArray{T, N}, B::AbstractArray{T, N}, dims::D) where {T, N, D}
+@generated function aminusb_exp_sum!(C::AbstractArray{Tₒ, N}, A::AbstractArray{T, N}, B::AbstractArray{T, N}, dims::D) where {Tₒ, T, N, D}
     aminusb_exp_sum_quote(N, D)
 end
 
-function logself_plusb!(C::AbstractArray{T, N}, B::AbstractArray{T, N}) where {T, N}
+function logself_plusb!(C::AbstractArray{Tₒ, N}, B::AbstractArray{T, N}) where {Tₒ, T, N}
     @turbo for i ∈ eachindex(C)
         C[i] = B[i] + log(C[i])
     end
@@ -81,11 +81,11 @@ function taminusb_exp_sum_quote(N::Int, D)
     end
 end
 
-@generated function taminusb_exp_sum!(C::AbstractArray{T, N}, A::AbstractArray{T, N}, B::AbstractArray{T, N}, dims::D) where {T, N, D}
+@generated function taminusb_exp_sum!(C::AbstractArray{Tₒ, N}, A::AbstractArray{T, N}, B::AbstractArray{T, N}, dims::D) where {Tₒ, T, N, D}
     taminusb_exp_sum_quote(N, D)
 end
 
-function tlogself_plusb!(C::AbstractArray{T, N}, B::AbstractArray{T, N}) where {T, N}
+function tlogself_plusb!(C::AbstractArray{Tₒ, N}, B::AbstractArray{T, N}) where {Tₒ, T, N}
     @tturbo for i ∈ eachindex(C)
         C[i] = B[i] + log(C[i])
     end

@@ -32,7 +32,7 @@ function aminusb_exp_quote(N::Int, D)
     end
 end
 
-@generated function aminusb_exp!(C::AbstractArray{T, N}, A::AbstractArray{T, N}, B::AbstractArray{T, N}, dims::D) where {T, N, D}
+@generated function aminusb_exp!(C::AbstractArray{Tₒ, N}, A::AbstractArray{T, N}, B::AbstractArray{T, N}, dims::D) where {Tₒ, T, N, D}
     aminusb_exp_quote(N, D)
 end
 
@@ -74,7 +74,7 @@ function taminusb_exp_quote(N::Int, D)
     end
 end
 
-@generated function taminusb_exp!(C::AbstractArray{T, N}, A::AbstractArray{T, N}, B::AbstractArray{T, N}, dims::D) where {T, N, D}
+@generated function taminusb_exp!(C::AbstractArray{Tₒ, N}, A::AbstractArray{T, N}, B::AbstractArray{T, N}, dims::D) where {Tₒ, T, N, D}
     taminusb_exp_quote(N, D)
 end
 

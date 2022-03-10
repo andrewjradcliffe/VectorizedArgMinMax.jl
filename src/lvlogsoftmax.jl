@@ -26,8 +26,8 @@ function aminusb_quote(N::Int, D)
     end
 end
 
-@generated function aminusb!(C::AbstractArray{T, N}, A::AbstractArray{T, N}, B::AbstractArray{T, N},
-                             dims::D) where {T, N, D}
+@generated function aminusb!(C::AbstractArray{Tₒ, N}, A::AbstractArray{T, N}, B::AbstractArray{T, N},
+                             dims::D) where {Tₒ, T, N, D}
     aminusb_quote(N, D)
 end
 
@@ -74,8 +74,7 @@ function taminusb_quote(N::Int, D)
         return C
     end
 end
-@generated function taminusb!(C::AbstractArray{T, N}, A::AbstractArray{T, N}, B::AbstractArray{T, N},
-                              dims::D) where {T, N, D}
+@generated function taminusb!(C::AbstractArray{Tₒ, N}, A::AbstractArray{T, N}, B::AbstractArray{T, N}, dims::D) where {Tₒ, T, N, D}
     taminusb_quote(N, D)
 end
 

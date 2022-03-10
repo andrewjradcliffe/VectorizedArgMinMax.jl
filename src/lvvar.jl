@@ -28,7 +28,7 @@ function sumsqdiff_quote(N::Int, D)
     end
 end
 @generated function sumsqdiff!(C::AbstractArray{Tₒ, N}, A::AbstractArray{T, N},
-                               B::AbstractArray{T, N}, dims::D) where {Tₒ, T, N, D}
+                               B::AbstractArray{Tₘ, N}, dims::D) where {Tₒ, T, Tₘ, N, D}
     sumsqdiff_quote(N, D)
 end
 
@@ -83,7 +83,7 @@ function tsumsqdiff_quote(N::Int, D)
     end
 end
 @generated function tsumsqdiff!(C::AbstractArray{Tₒ, N}, A::AbstractArray{T, N},
-                                B::AbstractArray{T, N}, dims::D) where {Tₒ, T, N, D}
+                                B::AbstractArray{Tₘ, N}, dims::D) where {Tₒ, T, Tₘ, N, D}
     tsumsqdiff_quote(N, D)
 end
 
