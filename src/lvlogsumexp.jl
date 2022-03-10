@@ -94,8 +94,7 @@ end
 
 function lvtlse(A::AbstractArray{T, N}, dims::NTuple{M, Int}) where {T, N, M}
     if ntuple(identity, Val(N)) ⊆ dims
-        # return hvncat(ntuple(i -> 1, Val(N)), true, lvlse1(A))
-        C = hvncat(ntuple(i -> 1, Val(N)), true, lvlse1(A))
+        C = hvncat(ntuple(i -> 1, Val(N)), true, lvtlse1(A))
     else
         B = lvtmaximum(A, dims=dims)
         Dᴮ = size(B)
