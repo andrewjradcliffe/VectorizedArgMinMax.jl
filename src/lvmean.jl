@@ -42,16 +42,25 @@ function smul!(A::AbstractArray{T, N}, x::T) where {T, N}
     A
 end
 
+function smul!(B::AbstractArray{Tₒ, N}, A::AbstractArray{T, N}, x::Tₒ) where {Tₒ, T, N}
+    @turbo for i ∈ eachindex(A)
+        B[i] = A[i] * x
+    end
+    B
+end
+smul(A::AbstractArray{T, N}, x::Tₒ) where {Tₒ, T, N} = smul!(similar(A, Tₒ), A, x)
+
 function lvmean(A::AbstractArray{T, N}, dims::NTuple{M, Int}) where {T, N, M}
     B = lvsum(A, dims=dims)
     Dᴬ = size(A)
-    denom = one(eltype(B))
+    denom = 1
     for d ∈ eachindex(Dᴬ)
         denom = d ∈ dims ? denom * Dᴬ[d] : denom
     end
     x = inv(denom)
-    smul!(B, x)
-    B
+    # smul!(B, x)
+    # B
+    return eltype(B) <: AbstractFloat ? smul!(B, x) : smul(B, x)
 end
 lvmean(A::AbstractArray{T, N}, dims::Int) where {T, N} = lvmean(A, (dims,))
 lvmean(A::AbstractArray{T, N}; dims=:) where {T, N} = lvmean(A, dims)
@@ -70,13 +79,14 @@ end
 function lvmean(f, A::AbstractArray{T, N}, dims::NTuple{M, Int}) where {T, N, M}
     B = lvsum(f, A, dims=dims)
     Dᴬ = size(A)
-    denom = one(eltype(B))
+    denom = 1
     for d ∈ eachindex(Dᴬ)
         denom = d ∈ dims ? denom * Dᴬ[d] : denom
     end
     x = inv(denom)
-    smul!(B, x)
-    B
+    # smul!(B, x)
+    # B
+    return eltype(B) <: AbstractFloat ? smul!(B, x) : smul(B, x)
 end
 lvmean(f, A::AbstractArray{T, N}, dims::Int) where {T, N} = lvmean(f, A, (dims,))
 lvmean(f, A::AbstractArray{T, N}; dims=:) where {T, N} = lvmean(f, A, dims)
