@@ -31,7 +31,7 @@ end
 end
 
 function logself_plusb!(C::AbstractArray{T, N}, B::AbstractArray{T, N}) where {T, N}
-    @turbo for i ∈ eachindex(A)
+    @turbo for i ∈ eachindex(C)
         C[i] = B[i] + log(C[i])
     end
     C
@@ -80,7 +80,7 @@ end
 end
 
 function tlogself_plusb!(C::AbstractArray{T, N}, B::AbstractArray{T, N}) where {T, N}
-    @tturbo for i ∈ eachindex(A)
+    @tturbo for i ∈ eachindex(C)
         C[i] = B[i] + log(C[i])
     end
     C
