@@ -37,10 +37,69 @@ end
 end
 
 function lvsoftmax(A::AbstractArray{T, N}, dims::NTuple{M, Int}) where {T, N, M}
-    B = lvlse(A, dims=dims)
-    Dᴮ′ = ntuple(d -> d ∈ dims ? StaticInt(1) : size(B, d), N)
-    C = similar(A, promote_type(T, eltype(B)))
-    aminusb_exp!(C, A, B)
+    if ntuple(identity, Val(N)) ⊆ dims
+        C = lvsoftmax1(A)
+    else
+        B = lvlse(A, dims=dims)
+        Dᴮ′ = ntuple(d -> d ∈ dims ? StaticInt(1) : size(B, d), N)
+        C = similar(A, promote_type(T, eltype(B)))
+        aminusb_exp!(C, A, B, Dᴮ′)
+    end
+    return C
+end
+
+lvsoftmax(A::AbstractArray{T, N}, dims::Int) where {T, N} = lvsoftmax(A, (dims,))
+lvsoftmax(A::AbstractArray{T, N}; dims=:) where {T, N} = lvsoftmax(A, dims)
+lvsoftmax(A::AbstractArray{T, N}) where {T, N} = lvsoftmax1(A)
+lvsoftmax(A::AbstractArray{T, N}, ::Colon) where {T, N} = lvsoftmax1(A)
+
+function lvsoftmax1(A::AbstractArray{T, N}) where {T, N}
+    b = lvlse1(A)
+    C = similar(A, Base.promote_op(exp, T))
+    @turbo for i ∈ eachindex(A)
+        C[i] = exp(A[i] - b)
+    end
     C
 end
 
+################ threaded version
+
+function taminusb_exp_quote(N::Int, D)
+    ls = loopgen(N)
+    body = aminusb_expbody(N, D)
+    push!(ls.args, body)
+    return quote
+        @tturbo $ls
+        return C
+    end
+end
+
+@generated function taminusb_exp!(C::AbstractArray{T, N}, A::AbstractArray{T, N}, B::AbstractArray{T, N}, dims::D) where {T, N, D}
+    taminusb_exp_quote(N, D)
+end
+
+function lvtsoftmax(A::AbstractArray{T, N}, dims::NTuple{M, Int}) where {T, N, M}
+    if ntuple(identity, Val(N)) ⊆ dims
+        C = lvtsoftmax1(A)
+    else
+        B = lvtlse(A, dims=dims)
+        Dᴮ′ = ntuple(d -> d ∈ dims ? StaticInt(1) : size(B, d), N)
+        C = similar(A, promote_type(T, eltype(B)))
+        taminusb_exp!(C, A, B, Dᴮ′)
+    end
+    return C
+end
+
+lvtsoftmax(A::AbstractArray{T, N}, dims::Int) where {T, N} = lvtsoftmax(A, (dims,))
+lvtsoftmax(A::AbstractArray{T, N}; dims=:) where {T, N} = lvtsoftmax(A, dims)
+lvtsoftmax(A::AbstractArray{T, N}) where {T, N} = lvtsoftmax1(A)
+lvtsoftmax(A::AbstractArray{T, N}, ::Colon) where {T, N} = lvtsoftmax1(A)
+
+function lvtsoftmax1(A::AbstractArray{T, N}) where {T, N}
+    b = lvtlse1(A)
+    C = similar(A, Base.promote_op(exp, T))
+    @tturbo for i ∈ eachindex(A)
+        C[i] = exp(A[i] - b)
+    end
+    C
+end
