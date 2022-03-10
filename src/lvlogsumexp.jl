@@ -52,7 +52,6 @@ function lvlse(A::AbstractArray{T, N}, dims::NTuple{M, Int}) where {T, N, M}
     B = zeros(Tₒ, Dᴮ)
     Dᴮ′ = ntuple(d -> d ∈ dims ? StaticInt(1) : Dᴮ[d], N)
     expminus!(B, A, α, Dᴮ′)
-    apluslogb!(α, B)
     return eltype(α) <: AbstractFloat ? apluslogb!(α, B) : apluslog(α, B)
 end
 
@@ -110,7 +109,6 @@ function lvtlse(A::AbstractArray{T, N}, dims::NTuple{M, Int}) where {T, N, M}
     B = zeros(Tₒ, Dᴮ)
     Dᴮ′ = ntuple(d -> d ∈ dims ? StaticInt(1) : Dᴮ[d], N)
     texpminus!(B, A, α, Dᴮ′)
-    tapluslogb!(α, B)
     return eltype(α) <: AbstractFloat ? tapluslogb!(α, B) : tapluslog(α, B)
 end
 
