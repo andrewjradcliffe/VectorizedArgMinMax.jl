@@ -38,13 +38,19 @@ function logself_plusb!(C::AbstractArray{T, N}, B::AbstractArray{T, N}) where {T
 end
 
 function lvlse(A::AbstractArray{T, N}, dims::NTuple{M, Int}) where {T, N, M}
-    B = lvmaximum(A, dims=dims)
-    Dᴮ = size(B)
-    Dᴮ′ = ntuple(d -> d ∈ dims ? StaticInt(1) : Dᴮ[d], N)
-    C = zeros(Base.promote_op(exp, T), Dᴮ)
-    aminusb_exp_sum!(C, A, B, Dᴮ′)
-    logself_plusb!(C, B)
-    C
+    if ntuple(identity, Val(N)) ⊆ dims
+        # return hvncat(ntuple(i -> 1, Val(N)), true, lvlse1(A))
+        C = hvncat(ntuple(i -> 1, Val(N)), true, lvlse1(A))
+    else
+        B = lvmaximum(A, dims=dims)
+        Dᴮ = size(B)
+        Dᴮ′ = ntuple(d -> d ∈ dims ? StaticInt(1) : Dᴮ[d], N)
+        C = zeros(Base.promote_op(exp, T), Dᴮ)
+        aminusb_exp_sum!(C, A, B, Dᴮ′)
+        logself_plusb!(C, B)
+        # return C
+    end
+    return C
 end
 
 lvlse(A::AbstractArray{T, N}, dims::Int) where {T, N} = lvlse(A, (dims,))
@@ -87,13 +93,19 @@ function tlogself_plusb!(C::AbstractArray{T, N}, B::AbstractArray{T, N}) where {
 end
 
 function lvtlse(A::AbstractArray{T, N}, dims::NTuple{M, Int}) where {T, N, M}
-    B = lvtmaximum(A, dims=dims)
-    Dᴮ = size(B)
-    Dᴮ′ = ntuple(d -> d ∈ dims ? StaticInt(1) : Dᴮ[d], N)
-    C = zeros(Base.promote_op(exp, T), Dᴮ)
-    taminusb_exp_sum!(C, A, B, Dᴮ′)
-    tlogself_plusb!(C, B)
-    C
+    if ntuple(identity, Val(N)) ⊆ dims
+        # return hvncat(ntuple(i -> 1, Val(N)), true, lvlse1(A))
+        C = hvncat(ntuple(i -> 1, Val(N)), true, lvlse1(A))
+    else
+        B = lvtmaximum(A, dims=dims)
+        Dᴮ = size(B)
+        Dᴮ′ = ntuple(d -> d ∈ dims ? StaticInt(1) : Dᴮ[d], N)
+        C = zeros(Base.promote_op(exp, T), Dᴮ)
+        taminusb_exp_sum!(C, A, B, Dᴮ′)
+        tlogself_plusb!(C, B)
+        C
+    end
+    return C
 end
 
 lvtlse(A::AbstractArray{T, N}, dims::Int) where {T, N} = lvtlse(A, (dims,))
