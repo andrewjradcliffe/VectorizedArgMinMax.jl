@@ -61,13 +61,17 @@ function reduce_quote(F, N::Int, D)
 end
 
 function lvreduce(f, A::AbstractArray{T, N}, dims::NTuple{M, Int}) where {T, N, M}
-    Dᴬ = size(A)
-    Dᴮ = ntuple(d -> d ∈ dims ? 1 : Dᴬ[d], N)
-    B = zeros(Base.promote_op(f, T), Dᴮ)
-    # Dᴮ′ = ntuple(d -> StaticInt(Dᴮ[d]), N)
-    Dᴮ′ = ntuple(d -> d ∈ dims ? StaticInt(1) : Dᴮ[d], N)
-    _lvreduce!(f, B, A, Dᴮ′)
-    B
+    if ntuple(identity, Val(N)) ⊆ dims
+        B = hvncat(ntuple(i -> 1, Val(N)), true, lvreduce1(f, A))
+    else
+        Dᴬ = size(A)
+        Dᴮ = ntuple(d -> d ∈ dims ? 1 : Dᴬ[d], N)
+        B = zeros(Base.promote_op(f, T), Dᴮ)
+        # Dᴮ′ = ntuple(d -> StaticInt(Dᴮ[d]), N)
+        Dᴮ′ = ntuple(d -> d ∈ dims ? StaticInt(1) : Dᴮ[d], N)
+        _lvreduce!(f, B, A, Dᴮ′)
+    end
+    return B
 end
 
 @generated function _lvreduce!(f::F, B::AbstractArray{T, N}, A::AbstractArray{T, N}, dims::D) where {F, T, N, D}
@@ -98,13 +102,17 @@ lvreduce(f, A::AbstractArray{T, N}, ::Colon) where {T, N} = lvreduce1(f, A)
 end
 for (op, init) ∈ zip((:+, :-, :*, :max, :min), (:zero, :zero, :one, :typemin, :typemax))
     @eval function lvreduce(::typeof($op), A::AbstractArray{T, N}, dims::NTuple{M, Int}) where {T, N, M}
-        Dᴬ = size(A)
-        Dᴮ = ntuple(d -> d ∈ dims ? 1 : Dᴬ[d], N)
-        B = fill($init(T), Dᴮ)
-        # Dᴮ′ = ntuple(d -> StaticInt(Dᴮ[d]), N)
-        Dᴮ′ = ntuple(d -> d ∈ dims ? StaticInt(1) : Dᴮ[d], N)
-        _lvreduce!($op, B, A, Dᴮ′)
-        B
+        if ntuple(identity, Val(N)) ⊆ dims
+            B = hvncat(ntuple(i -> 1, Val(N)), true, lvreduce1($op, A))
+        else
+            Dᴬ = size(A)
+            Dᴮ = ntuple(d -> d ∈ dims ? 1 : Dᴬ[d], N)
+            B = fill($init(T), Dᴮ)
+            # Dᴮ′ = ntuple(d -> StaticInt(Dᴮ[d]), N)
+            Dᴮ′ = ntuple(d -> d ∈ dims ? StaticInt(1) : Dᴮ[d], N)
+            _lvreduce!($op, B, A, Dᴮ′)
+        end
+        return B
     end
     @eval function lvreduce1(::typeof($op), A::AbstractArray{T, N}) where {T, N}
         s = $init(T)
@@ -142,13 +150,17 @@ function mapreduce_quote(F, OP, N::Int, D)
 end
 
 function lvmapreduce(f, op, A::AbstractArray{T, N}, dims::NTuple{M, Int}) where {T, N, M}
-    Dᴬ = size(A)
-    Dᴮ = ntuple(d -> d ∈ dims ? 1 : Dᴬ[d], N)
-    B = zeros(Base.promote_op(f, T), Dᴮ)
-    # Dᴮ′ = ntuple(d -> StaticInt(Dᴮ[d]), N)
-    Dᴮ′ = ntuple(d -> d ∈ dims ? StaticInt(1) : Dᴮ[d], N)
-    _lvmapreduce!(f, op, B, A, Dᴮ′)
-    B
+    if ntuple(identity, Val(N)) ⊆ dims
+        B = hvncat(ntuple(i -> 1, Val(N)), true, lvmapreduce1(f, op, A))
+    else
+        Dᴬ = size(A)
+        Dᴮ = ntuple(d -> d ∈ dims ? 1 : Dᴬ[d], N)
+        B = zeros(Base.promote_op(f, T), Dᴮ)
+        # Dᴮ′ = ntuple(d -> StaticInt(Dᴮ[d]), N)
+        Dᴮ′ = ntuple(d -> d ∈ dims ? StaticInt(1) : Dᴮ[d], N)
+        _lvmapreduce!(f, op, B, A, Dᴮ′)
+    end
+    return B
 end
 
 @generated function _lvmapreduce!(f::F, op::OP, B::AbstractArray{T, N}, A::AbstractArray{T, N}, dims::D) where {F, OP, T, N, D}
@@ -181,13 +193,17 @@ lvmapreduce(f, op, A::AbstractArray{T, N}, ::Colon) where {T, N} = lvmapreduce1(
 end
 for (op, init) ∈ zip((:+, :-, :*, :max, :min), (:zero, :zero, :one, :typemin, :typemax))
     @eval function lvmapreduce(f, ::typeof($op), A::AbstractArray{T, N}, dims::NTuple{M, Int}) where {T, N, M}
-        Dᴬ = size(A)
-        Dᴮ = ntuple(d -> d ∈ dims ? 1 : Dᴬ[d], N)
-        B = fill($init(T), Dᴮ)
-        # Dᴮ′ = ntuple(d -> StaticInt(Dᴮ[d]), N)
-        Dᴮ′ = ntuple(d -> d ∈ dims ? StaticInt(1) : Dᴮ[d], N)
-        _lvmapreduce!(f, $op, B, A, Dᴮ′)
-        B
+        if ntuple(identity, Val(N)) ⊆ dims
+            B = hvncat(ntuple(i -> 1, Val(N)), true, lvmapreduce1(f, $op, A))
+        else
+            Dᴬ = size(A)
+            Dᴮ = ntuple(d -> d ∈ dims ? 1 : Dᴬ[d], N)
+            B = fill($init(T), Dᴮ)
+            # Dᴮ′ = ntuple(d -> StaticInt(Dᴮ[d]), N)
+            Dᴮ′ = ntuple(d -> d ∈ dims ? StaticInt(1) : Dᴮ[d], N)
+            _lvmapreduce!(f, $op, B, A, Dᴮ′)
+        end
+        return B
     end
     @eval function lvmapreduce1(f, ::typeof($op), A::AbstractArray{T, N}) where {T, N}
         s = $init(T)
@@ -223,13 +239,17 @@ function treduce_quote(F, N::Int, D)
     end
 end
 function lvtreduce(f, A::AbstractArray{T, N}, dims::NTuple{M, Int}) where {T, N, M}
-    Dᴬ = size(A)
-    Dᴮ = ntuple(d -> d ∈ dims ? 1 : Dᴬ[d], N)
-    B = zeros(Base.promote_op(f, T), Dᴮ)
-    # Dᴮ′ = ntuple(d -> StaticInt(Dᴮ[d]), N)
-    Dᴮ′ = ntuple(d -> d ∈ dims ? StaticInt(1) : Dᴮ[d], N)
-    _lvtreduce!(f, B, A, Dᴮ′)
-    B
+    if ntuple(identity, Val(N)) ⊆ dims
+        B = hvncat(ntuple(i -> 1, Val(N)), true, lvtreduce1(f, A))
+    else
+        Dᴬ = size(A)
+        Dᴮ = ntuple(d -> d ∈ dims ? 1 : Dᴬ[d], N)
+        B = zeros(Base.promote_op(f, T), Dᴮ)
+        # Dᴮ′ = ntuple(d -> StaticInt(Dᴮ[d]), N)
+        Dᴮ′ = ntuple(d -> d ∈ dims ? StaticInt(1) : Dᴮ[d], N)
+        _lvtreduce!(f, B, A, Dᴮ′)
+    end
+    return B
 end
 @generated function _lvtreduce!(f::F, B::AbstractArray{T, N}, A::AbstractArray{T, N}, dims::D) where {F, T, N, D}
     treduce_quote(F, N, D)
@@ -259,13 +279,17 @@ lvtreduce(f, A::AbstractArray{T, N}, ::Colon) where {T, N} = lvtreduce1(f, A)
 end
 for (op, init) ∈ zip((:+, :-, :*, :max, :min), (:zero, :zero, :one, :typemin, :typemax))
     @eval function lvtreduce(::typeof($op), A::AbstractArray{T, N}, dims::NTuple{M, Int}) where {T, N, M}
-        Dᴬ = size(A)
-        Dᴮ = ntuple(d -> d ∈ dims ? 1 : Dᴬ[d], N)
-        B = fill($init(T), Dᴮ)
-        # Dᴮ′ = ntuple(d -> StaticInt(Dᴮ[d]), N)
-        Dᴮ′ = ntuple(d -> d ∈ dims ? StaticInt(1) : Dᴮ[d], N)
-        _lvtreduce!($op, B, A, Dᴮ′)
-        B
+        if ntuple(identity, Val(N)) ⊆ dims
+            B = hvncat(ntuple(i -> 1, Val(N)), true, lvtreduce1($op, A))
+        else
+            Dᴬ = size(A)
+            Dᴮ = ntuple(d -> d ∈ dims ? 1 : Dᴬ[d], N)
+            B = fill($init(T), Dᴮ)
+            # Dᴮ′ = ntuple(d -> StaticInt(Dᴮ[d]), N)
+            Dᴮ′ = ntuple(d -> d ∈ dims ? StaticInt(1) : Dᴮ[d], N)
+            _lvtreduce!($op, B, A, Dᴮ′)
+        end
+        return B
     end
     @eval function lvtreduce1(::typeof($op), A::AbstractArray{T, N}) where {T, N}
         s = $init(T)
@@ -303,13 +327,17 @@ function tmapreduce_quote(F, OP, N::Int, D)
     end
 end
 function lvtmapreduce(f, op, A::AbstractArray{T, N}, dims::NTuple{M, Int}) where {T, N, M}
-    Dᴬ = size(A)
-    Dᴮ = ntuple(d -> d ∈ dims ? 1 : Dᴬ[d], N)
-    B = zeros(Base.promote_op(f, T), Dᴮ)
-    # Dᴮ′ = ntuple(d -> StaticInt(Dᴮ[d]), N)
-    Dᴮ′ = ntuple(d -> d ∈ dims ? StaticInt(1) : Dᴮ[d], N)
-    _lvtmapreduce!(f, op, B, A, Dᴮ′)
-    B
+    if ntuple(identity, Val(N)) ⊆ dims
+        B = hvncat(ntuple(i -> 1, Val(N)), true, lvtmapreduce1(f, op, A))
+    else
+        Dᴬ = size(A)
+        Dᴮ = ntuple(d -> d ∈ dims ? 1 : Dᴬ[d], N)
+        B = zeros(Base.promote_op(f, T), Dᴮ)
+        # Dᴮ′ = ntuple(d -> StaticInt(Dᴮ[d]), N)
+        Dᴮ′ = ntuple(d -> d ∈ dims ? StaticInt(1) : Dᴮ[d], N)
+        _lvtmapreduce!(f, op, B, A, Dᴮ′)
+    end
+    return B
 end
 
 @generated function _lvtmapreduce!(f::F, op::OP, B::AbstractArray{T, N}, A::AbstractArray{T, N}, dims::D) where {F, OP, T, N, D}
@@ -341,13 +369,17 @@ lvtmapreduce(f, op, A::AbstractArray{T, N}, ::Colon) where {T, N} = lvtmapreduce
 end
 for (op, init) ∈ zip((:+, :-, :*, :max, :min), (:zero, :zero, :one, :typemin, :typemax))
     @eval function lvtmapreduce(f, ::typeof($op), A::AbstractArray{T, N}, dims::NTuple{M, Int}) where {T, N, M}
-        Dᴬ = size(A)
-        Dᴮ = ntuple(d -> d ∈ dims ? 1 : Dᴬ[d], N)
-        B = fill($init(T), Dᴮ)
-        # Dᴮ′ = ntuple(d -> StaticInt(Dᴮ[d]), N)
-        Dᴮ′ = ntuple(d -> d ∈ dims ? StaticInt(1) : Dᴮ[d], N)
-        _lvtmapreduce!(f, $op, B, A, Dᴮ′)
-        B
+        if ntuple(identity, Val(N)) ⊆ dims
+            B = hvncat(ntuple(i -> 1, Val(N)), true, lvtmapreduce1(f, $op, A))
+        else
+            Dᴬ = size(A)
+            Dᴮ = ntuple(d -> d ∈ dims ? 1 : Dᴬ[d], N)
+            B = fill($init(T), Dᴮ)
+            # Dᴮ′ = ntuple(d -> StaticInt(Dᴮ[d]), N)
+            Dᴮ′ = ntuple(d -> d ∈ dims ? StaticInt(1) : Dᴮ[d], N)
+            _lvtmapreduce!(f, $op, B, A, Dᴮ′)
+        end
+        return B
     end
     @eval function lvtmapreduce1(f, ::typeof($op), A::AbstractArray{T, N}) where {T, N}
         s = $init(T)
