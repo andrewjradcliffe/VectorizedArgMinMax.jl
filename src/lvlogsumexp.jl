@@ -30,21 +30,6 @@ end
     aminusb_exp_sum_quote(N, D)
 end
 
-# function apluslogb!(A::AbstractArray{T, N}, B::AbstractArray{T, N}) where {T, N}
-#     @turbo for i ∈ eachindex(A)
-#         A[i] += log(B[i])
-#     end
-#     A
-# end
-# function apluslogb!(C::AbstractArray{T, N}, A::AbstractArray{T, N}, B::AbstractArray{T, N}) where {T, N}
-#     @turbo for i ∈ eachindex(A)
-#         C[i] = A[i] + log(B[i])
-#     end
-#     C
-# end
-# apluslogb(A::AbstractArray{T, N}, B::AbstractArray{S, N}) where {T, N, S} =
-#     apluslogb!(similar(A, promote_type(T, S)), A, B)
-
 function logself_plusb!(C::AbstractArray{T, N}, B::AbstractArray{T, N}) where {T, N}
     @turbo for i ∈ eachindex(A)
         C[i] = B[i] + log(C[i])
@@ -53,13 +38,6 @@ function logself_plusb!(C::AbstractArray{T, N}, B::AbstractArray{T, N}) where {T
 end
 
 function lvlse(A::AbstractArray{T, N}, dims::NTuple{M, Int}) where {T, N, M}
-    # α = lvmaximum(A, dims=dims)
-    # Dᴮ = size(α)
-    # Tₒ = Base.promote_op(exp, T)
-    # B = zeros(Tₒ, Dᴮ)
-    # Dᴮ′ = ntuple(d -> d ∈ dims ? StaticInt(1) : Dᴮ[d], N)
-    # expminus!(B, A, α, Dᴮ′)
-    # return eltype(α) <: AbstractFloat ? apluslogb!(α, B) : apluslog(α, B)
     B = lvmaximum(A, dims=dims)
     Dᴮ = size(B)
     Dᴮ′ = ntuple(d -> d ∈ dims ? StaticInt(1) : Dᴮ[d], N)
@@ -101,20 +79,6 @@ end
     taminusb_exp_sum_quote(N, D)
 end
 
-# function tapluslogb!(A::AbstractArray{T, N}, B::AbstractArray{T, N}) where {T, N}
-#     @tturbo for i ∈ eachindex(A)
-#         A[i] += log(B[i])
-#     end
-#     A
-# end
-# function tapluslogb!(C::AbstractArray{T, N}, A::AbstractArray{T, N}, B::AbstractArray{T, N}) where {T, N}
-#     @tturbo for i ∈ eachindex(A)
-#         C[i] = A[i] + log(B[i])
-#     end
-#     C
-# end
-# tapluslogb(A::AbstractArray{T, N}, B::AbstractArray{S, N}) where {T, N, S} =
-#     tapluslogb!(similar(A, promote_type(T, S)), A, B)
 function tlogself_plusb!(C::AbstractArray{T, N}, B::AbstractArray{T, N}) where {T, N}
     @tturbo for i ∈ eachindex(A)
         C[i] = B[i] + log(C[i])
@@ -123,13 +87,6 @@ function tlogself_plusb!(C::AbstractArray{T, N}, B::AbstractArray{T, N}) where {
 end
 
 function lvtlse(A::AbstractArray{T, N}, dims::NTuple{M, Int}) where {T, N, M}
-    # α = lvtmaximum(A, dims=dims)
-    # Dᴮ = size(α)
-    # Tₒ = Base.promote_op(exp, T)
-    # B = zeros(Tₒ, Dᴮ)
-    # Dᴮ′ = ntuple(d -> d ∈ dims ? StaticInt(1) : Dᴮ[d], N)
-    # texpminus!(B, A, α, Dᴮ′)
-    # return eltype(α) <: AbstractFloat ? tapluslogb!(α, B) : tapluslog(α, B)
     B = lvtmaximum(A, dims=dims)
     Dᴮ = size(B)
     Dᴮ′ = ntuple(d -> d ∈ dims ? StaticInt(1) : Dᴮ[d], N)
