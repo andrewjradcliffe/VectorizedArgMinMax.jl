@@ -30,19 +30,45 @@ end
     expminus_quote(N, D)
 end
 
-function _apluslogb!(A::AbstractArray{T, N}, B::AbstractArray{T, N}) where {T, N}
+function apluslogb!(A::AbstractArray{T, N}, B::AbstractArray{T, N}) where {T, N}
     @turbo for i ∈ eachindex(A)
         A[i] += log(B[i])
     end
     A
 end
+function apluslogb!(C::AbstractArray{T, N}, A::AbstractArray{T, N}, B::AbstractArray{T, N}) where {T, N}
+    @turbo for i ∈ eachindex(A)
+        C[i] = A[i] + log(B[i])
+    end
+    C
+end
+apluslogb(A::AbstractArray{T, N}, B::AbstractArray{S, N}) = apluslogb!(similar(A, promote_type(T, S)), A, B)
 
 function lvlse(A::AbstractArray{T, N}, dims::NTuple{M, Int}) where {T, N, M}
     α = lvmaximum(A, dims=dims)
     Dᴮ = size(α)
-    B = zeros(Base.promote_op(exp, T), Dᴮ)
+    Tₒ = Base.promote_op(exp, T)
+    B = zeros(Tₒ, Dᴮ)
     Dᴮ′ = ntuple(d -> d ∈ dims ? StaticInt(1) : Dᴮ[d], N)
     expminus!(B, A, α, Dᴮ′)
-    _apluslogb!(α, B)
-    α
+    apluslogb!(α, B)
+    return eltype(α) <: AbstractFloat ? apluslogb!(α, B) : apluslog(α, B)
 end
+
+lvlse(A::AbstractArray{T, N}, dims::Int) where {T, N} = lvlse(A, (dims,))
+lvlse(A::AbstractArray{T, N}; dims=:) where {T, N} = lvlse(A, dims)
+lvlse(A::AbstractArray{T, N}) where {T, N} = lvlse1(A)
+lvlse(A::AbstractArray{T, N}, ::Colon) where {T, N} = lvlse1(A)
+
+function lvlse1(A::AbstractArray{T, N}) where {T, N}
+    α = typemin(T)
+    s = zero(promote_type(T, Float64))
+    @turbo for i ∈ eachindex(A)
+        α = max(A[i], α)
+    end
+    @turbo for i ∈ eachindex(A)
+        s += exp(A[i] - α)
+    end
+    α + log(s)
+end
+
