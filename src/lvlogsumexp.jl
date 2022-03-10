@@ -87,9 +87,9 @@ function lvlse1(A::AbstractArray{T, N}) where {T, N}
 end
 
 ################ threaded version
-function texpminus_quote(N::Int, D)
+function taminusb_exp_sum_quote(N::Int, D)
     ls = loopgen(N)
-    body = expminusbody(N, D)
+    body = aminusb_exp_sumbody(N, D)
     push!(ls.args, body)
     return quote
         @tturbo $ls
@@ -97,33 +97,46 @@ function texpminus_quote(N::Int, D)
     end
 end
 
-@generated function texpminus!(B::AbstractArray{T, N}, A::AbstractArray{T, N}, α::AbstractArray{T, N}, dims::D) where {T, N, D}
-    texpminus_quote(N, D)
+@generated function taminusb_exp_sum!(C::AbstractArray{T, N}, A::AbstractArray{T, N}, B::AbstractArray{T, N}, dims::D) where {T, N, D}
+    taminusb_exp_sum_quote(N, D)
 end
 
-function tapluslogb!(A::AbstractArray{T, N}, B::AbstractArray{T, N}) where {T, N}
+# function tapluslogb!(A::AbstractArray{T, N}, B::AbstractArray{T, N}) where {T, N}
+#     @tturbo for i ∈ eachindex(A)
+#         A[i] += log(B[i])
+#     end
+#     A
+# end
+# function tapluslogb!(C::AbstractArray{T, N}, A::AbstractArray{T, N}, B::AbstractArray{T, N}) where {T, N}
+#     @tturbo for i ∈ eachindex(A)
+#         C[i] = A[i] + log(B[i])
+#     end
+#     C
+# end
+# tapluslogb(A::AbstractArray{T, N}, B::AbstractArray{S, N}) where {T, N, S} =
+#     tapluslogb!(similar(A, promote_type(T, S)), A, B)
+function tlogself_plusb!(C::AbstractArray{T, N}, B::AbstractArray{T, N}) where {T, N}
     @tturbo for i ∈ eachindex(A)
-        A[i] += log(B[i])
-    end
-    A
-end
-function tapluslogb!(C::AbstractArray{T, N}, A::AbstractArray{T, N}, B::AbstractArray{T, N}) where {T, N}
-    @tturbo for i ∈ eachindex(A)
-        C[i] = A[i] + log(B[i])
+        C[i] = B[i] + log(C[i])
     end
     C
 end
-tapluslogb(A::AbstractArray{T, N}, B::AbstractArray{S, N}) where {T, N, S} =
-    tapluslogb!(similar(A, promote_type(T, S)), A, B)
 
 function lvtlse(A::AbstractArray{T, N}, dims::NTuple{M, Int}) where {T, N, M}
-    α = lvtmaximum(A, dims=dims)
-    Dᴮ = size(α)
-    Tₒ = Base.promote_op(exp, T)
-    B = zeros(Tₒ, Dᴮ)
+    # α = lvtmaximum(A, dims=dims)
+    # Dᴮ = size(α)
+    # Tₒ = Base.promote_op(exp, T)
+    # B = zeros(Tₒ, Dᴮ)
+    # Dᴮ′ = ntuple(d -> d ∈ dims ? StaticInt(1) : Dᴮ[d], N)
+    # texpminus!(B, A, α, Dᴮ′)
+    # return eltype(α) <: AbstractFloat ? tapluslogb!(α, B) : tapluslog(α, B)
+    B = lvtmaximum(A, dims=dims)
+    Dᴮ = size(B)
     Dᴮ′ = ntuple(d -> d ∈ dims ? StaticInt(1) : Dᴮ[d], N)
-    texpminus!(B, A, α, Dᴮ′)
-    return eltype(α) <: AbstractFloat ? tapluslogb!(α, B) : tapluslog(α, B)
+    C = zeros(Base.promote_op(exp, T), Dᴮ)
+    taminusb_exp_sum!(C, A, B, Dᴮ′)
+    tlogself_plusb!(C, B)
+    C
 end
 
 lvtlse(A::AbstractArray{T, N}, dims::Int) where {T, N} = lvtlse(A, (dims,))
