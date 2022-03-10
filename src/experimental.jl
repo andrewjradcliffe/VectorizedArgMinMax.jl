@@ -414,3 +414,17 @@ end
 @generated function _mapm2treduce!(f::F, op::OP, B::AbstractArray{T, N}, A::AbstractArray{T, N}, dims::D) where {F, OP, T, N, D}
     mapm2treduce_quote(F, OP, N, D)
 end
+
+################################################################
+# 2022-03-09
+# Tests
+n = 4
+A = rand(rand(1:100, n)...);
+for pre ∈ (:lv, :lvt), post ∈ (:sum, :prod, :maximum, :minimum)
+    φ = Symbol(pre, post)
+    @timev @eval $φ(A, dims=(2,4))
+    A = rand(rand(1:100, n)...);
+    @timev @eval $φ(A, dims=(2,4))
+    @assert @eval $φ(A, dims=(2,4)) ≈ $post(A, dims=(2,4))
+end
+################################################################
