@@ -184,7 +184,7 @@ lvmapreduce(f, op, A::AbstractArray{T, N}, ::Colon) where {T, N} = lvmapreduce1(
     op = OP.instance
     f = F.instance
     quote
-        s = zero($T)
+        s = zero(Base.promote_op($f, $T))
         @turbo for i ∈ eachindex(A)
             s = $op(s, $f(A[i]))
         end
@@ -360,7 +360,7 @@ lvtmapreduce(f, op, A::AbstractArray{T, N}, ::Colon) where {T, N} = lvtmapreduce
     f = F.instance
     op = OP.instance
     quote
-        s = zero($T)
+        s = zero(Base.promote_op($f, $T))
         @tturbo for i ∈ eachindex(A)
             s = $op(s, $f(A[i]))
         end
