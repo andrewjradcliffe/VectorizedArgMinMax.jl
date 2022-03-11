@@ -37,10 +37,10 @@ function logself_plusb!(C::AbstractArray{Tₒ, N}, B::AbstractArray{T, N}) where
     C
 end
 
-function lvlse(A::AbstractArray{T, N}, dims::NTuple{M, Int}) where {T, N, M}
+function lvlogsumexp(A::AbstractArray{T, N}, dims::NTuple{M, Int}) where {T, N, M}
     if ntuple(identity, Val(N)) ⊆ dims
-        # return hvncat(ntuple(i -> 1, Val(N)), true, lvlse1(A))
-        C = hvncat(ntuple(i -> 1, Val(N)), true, lvlse1(A))
+        # return hvncat(ntuple(i -> 1, Val(N)), true, lvlogsumexp1(A))
+        C = hvncat(ntuple(i -> 1, Val(N)), true, lvlogsumexp1(A))
     else
         B = lvmaximum(A, dims=dims)
         Dᴮ = size(B)
@@ -53,12 +53,12 @@ function lvlse(A::AbstractArray{T, N}, dims::NTuple{M, Int}) where {T, N, M}
     return C
 end
 
-lvlse(A::AbstractArray{T, N}, dims::Int) where {T, N} = lvlse(A, (dims,))
-lvlse(A::AbstractArray{T, N}; dims=:) where {T, N} = lvlse(A, dims)
-lvlse(A::AbstractArray{T, N}) where {T, N} = lvlse1(A)
-lvlse(A::AbstractArray{T, N}, ::Colon) where {T, N} = lvlse1(A)
+lvlogsumexp(A::AbstractArray{T, N}, dims::Int) where {T, N} = lvlogsumexp(A, (dims,))
+lvlogsumexp(A::AbstractArray{T, N}; dims=:) where {T, N} = lvlogsumexp(A, dims)
+lvlogsumexp(A::AbstractArray{T, N}) where {T, N} = lvlogsumexp1(A)
+lvlogsumexp(A::AbstractArray{T, N}, ::Colon) where {T, N} = lvlogsumexp1(A)
 
-function lvlse1(A::AbstractArray{T, N}) where {T, N}
+function lvlogsumexp1(A::AbstractArray{T, N}) where {T, N}
     α = typemin(T)
     s = zero(promote_type(T, Float64))
     @turbo for i ∈ eachindex(A)
@@ -92,9 +92,9 @@ function tlogself_plusb!(C::AbstractArray{Tₒ, N}, B::AbstractArray{T, N}) wher
     C
 end
 
-function lvtlse(A::AbstractArray{T, N}, dims::NTuple{M, Int}) where {T, N, M}
+function lvtlogsumexp(A::AbstractArray{T, N}, dims::NTuple{M, Int}) where {T, N, M}
     if ntuple(identity, Val(N)) ⊆ dims
-        C = hvncat(ntuple(i -> 1, Val(N)), true, lvtlse1(A))
+        C = hvncat(ntuple(i -> 1, Val(N)), true, lvtlogsumexp1(A))
     else
         B = lvtmaximum(A, dims=dims)
         Dᴮ = size(B)
@@ -107,12 +107,12 @@ function lvtlse(A::AbstractArray{T, N}, dims::NTuple{M, Int}) where {T, N, M}
     return C
 end
 
-lvtlse(A::AbstractArray{T, N}, dims::Int) where {T, N} = lvtlse(A, (dims,))
-lvtlse(A::AbstractArray{T, N}; dims=:) where {T, N} = lvtlse(A, dims)
-lvtlse(A::AbstractArray{T, N}) where {T, N} = lvtlse1(A)
-lvtlse(A::AbstractArray{T, N}, ::Colon) where {T, N} = lvtlse1(A)
+lvtlogsumexp(A::AbstractArray{T, N}, dims::Int) where {T, N} = lvtlogsumexp(A, (dims,))
+lvtlogsumexp(A::AbstractArray{T, N}; dims=:) where {T, N} = lvtlogsumexp(A, dims)
+lvtlogsumexp(A::AbstractArray{T, N}) where {T, N} = lvtlogsumexp1(A)
+lvtlogsumexp(A::AbstractArray{T, N}, ::Colon) where {T, N} = lvtlogsumexp1(A)
 
-function lvtlse1(A::AbstractArray{T, N}) where {T, N}
+function lvtlogsumexp1(A::AbstractArray{T, N}) where {T, N}
     α = typemin(T)
     s = zero(promote_type(T, Float64))
     @tturbo for i ∈ eachindex(A)
