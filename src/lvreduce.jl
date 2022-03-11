@@ -74,7 +74,7 @@ function lvreduce(f, A::AbstractArray{T, N}, dims::NTuple{M, Int}) where {T, N, 
     return B
 end
 
-@generated function _lvreduce!(f::F, B::AbstractArray{T, N}, A::AbstractArray{T, N}, dims::D) where {F, T, N, D}
+@generated function _lvreduce!(f::F, B::AbstractArray{Tₒ, N}, A::AbstractArray{T, N}, dims::D) where {F, Tₒ, T, N, D}
     reduce_quote(F, N, D)
 end
 
@@ -163,7 +163,7 @@ function lvmapreduce(f, op, A::AbstractArray{T, N}, dims::NTuple{M, Int}) where 
     return B
 end
 
-@generated function _lvmapreduce!(f::F, op::OP, B::AbstractArray{T, N}, A::AbstractArray{T, N}, dims::D) where {F, OP, T, N, D}
+@generated function _lvmapreduce!(f::F, op::OP, B::AbstractArray{Tₒ, N}, A::AbstractArray{T, N}, dims::D) where {F, OP, Tₒ, T, N, D}
     mapreduce_quote(F, OP, N, D)
 end
 
@@ -198,7 +198,7 @@ for (op, init) ∈ zip((:+, :-, :*, :max, :min), (:zero, :zero, :one, :typemin, 
         else
             Dᴬ = size(A)
             Dᴮ = ntuple(d -> d ∈ dims ? 1 : Dᴬ[d], N)
-            B = fill($init(T), Dᴮ)
+            B = fill($init(Base.promote_op(f, T)), Dᴮ)
             # Dᴮ′ = ntuple(d -> StaticInt(Dᴮ[d]), N)
             Dᴮ′ = ntuple(d -> d ∈ dims ? StaticInt(1) : Dᴮ[d], N)
             _lvmapreduce!(f, $op, B, A, Dᴮ′)
@@ -206,7 +206,7 @@ for (op, init) ∈ zip((:+, :-, :*, :max, :min), (:zero, :zero, :one, :typemin, 
         return B
     end
     @eval function lvmapreduce1(f, ::typeof($op), A::AbstractArray{T, N}) where {T, N}
-        s = $init(T)
+        s = $init(Base.promote_op(f, T))
         @turbo for i ∈ eachindex(A)
             s = $op(s, f(A[i]))
         end
@@ -374,7 +374,7 @@ for (op, init) ∈ zip((:+, :-, :*, :max, :min), (:zero, :zero, :one, :typemin, 
         else
             Dᴬ = size(A)
             Dᴮ = ntuple(d -> d ∈ dims ? 1 : Dᴬ[d], N)
-            B = fill($init(T), Dᴮ)
+            B = fill($init(Base.promote_op(f, T)), Dᴮ)
             # Dᴮ′ = ntuple(d -> StaticInt(Dᴮ[d]), N)
             Dᴮ′ = ntuple(d -> d ∈ dims ? StaticInt(1) : Dᴮ[d], N)
             _lvtmapreduce!(f, $op, B, A, Dᴮ′)
@@ -382,7 +382,7 @@ for (op, init) ∈ zip((:+, :-, :*, :max, :min), (:zero, :zero, :one, :typemin, 
         return B
     end
     @eval function lvtmapreduce1(f, ::typeof($op), A::AbstractArray{T, N}) where {T, N}
-        s = $init(T)
+        s = $init(Base.promote_op(f, T))
         @tturbo for i ∈ eachindex(A)
             s = $op(s, f(A[i]))
         end
