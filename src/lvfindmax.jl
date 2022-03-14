@@ -81,12 +81,12 @@ function innerpost(N::Int, D)
     block
 end
 
-function compareblock(N::Int)
+function compareblock(f, N::Int)
     block = Expr(:block)
     a = Expr(:ref, :A, ntuple(d -> Symbol(:i_, d), N)...)
     d = sumprodprecomputed2(N)
     push!(d.args, :D_sp)
-    yₑ = Expr(:(=), :y, Expr(:call, :(>), a, :m))
+    yₑ = Expr(:(=), :y, Expr(:call, Symbol(f), a, :m)) # f should only be > or <
     mₑ = Expr(:(=), :m, Expr(:if, :y, a, :m))
     jₑ = Expr(:(=), :j, Expr(:if, :y, d, :j))
     push!(block.args, yₑ)
