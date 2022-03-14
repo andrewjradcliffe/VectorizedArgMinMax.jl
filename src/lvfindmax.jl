@@ -56,7 +56,8 @@ function outerloopgen(N::Int, D)
     block = Expr(:block)
     params = D.parameters
     for d = N:-1:1
-        if params[d] != Static.One
+        # if params[d] != Static.One
+        if params[d] !== Val{1}
             ex = Expr(:(=), Symbol(:i_, d), Expr(:call, :axes, :A, d))
             push!(block.args, ex)
         end
@@ -69,7 +70,8 @@ function innerloopgen(N::Int, D)
     block = Expr(:block)
     params = D.parameters
     for d = N:-1:1
-        if params[d] == Static.One
+        # if params[d] == Static.One
+        if params[d] === Val{1}
             ex = Expr(:(=), Symbol(:i_, d), Expr(:call, :axes, :A, d))
             push!(block.args, ex)
         end
@@ -81,8 +83,10 @@ end
 function innerpost(N::Int, D)
     params = D.parameters
     block = Expr(:block)
-    b = Expr(:ref, :B, ntuple(d -> params[d] == Static.One ? 1 : Symbol(:i_, d), N)...)
-    c = Expr(:ref, :C, ntuple(d -> params[d] == Static.One ? 1 : Symbol(:i_, d), N)...)
+    # b = Expr(:ref, :B, ntuple(d -> params[d] == Static.One ? 1 : Symbol(:i_, d), N)...)
+    # c = Expr(:ref, :C, ntuple(d -> params[d] == Static.One ? 1 : Symbol(:i_, d), N)...)
+    b = Expr(:ref, :B, ntuple(d -> params[d] === Val{1} ? 1 : Symbol(:i_, d), N)...)
+    c = Expr(:ref, :C, ntuple(d -> params[d] === Val{1} ? 1 : Symbol(:i_, d), N)...)
     e1 = Expr(:(=), b, :m)
     e2 = Expr(:(=), c, :j)
     push!(block.args, e1)
@@ -90,11 +94,11 @@ function innerpost(N::Int, D)
     block
 end
 
-function compareblock5(N::Int, D)
+function compareblock(N::Int, D)
     block = Expr(:block)
     params = D.parameters
     a = Expr(:ref, :A, ntuple(d -> Symbol(:i_, d), N)...)
-    d = sumprodprecomputed2(N)
+    d = sumprodprecomputed(N)
     push!(d.args, :D_sp)
     yₑ = Expr(:(=), :y, Expr(:call, :(>), a, :m))
     mₑ = Expr(:(=), :m, Expr(:if, :y, a, :m))
@@ -105,14 +109,14 @@ function compareblock5(N::Int, D)
     block
 end
 
-function findmax5_quote(N::Int, D)
+function findmax_quote(N::Int, D)
     block1 = sizeblock(N)
     block2 = sizeproductsblock(N)
     block3 = Expr(:block, sumprodconstant(N), Expr(:(=), :D_sp, Expr(:call, :-, :D_sp)))
     outerloops = outerloopgen(N, D)
     block4 = Expr(:block, Expr(:(=), :j, 1), Expr(:(=), :m, Expr(:call, :typemin, :T)))
     innerloops = innerloopgen(N, D)
-    block5 = compareblock5(N, D)
+    block5 = compareblock(N, D)
     push!(innerloops.args, block5)
     push!(block4.args, innerloops)
     block6 = innerpost(N, D)
@@ -125,3 +129,21 @@ function findmax5_quote(N::Int, D)
         $outerloops
     end
 end
+@generated function _findmax!(C::AbstractArray{Tₒ, N}, A::AbstractArray{T, N},
+                             B::AbstractArray{T, N}, dims::D) where {Tₒ, T, N, D}
+    findmax_quote(N, D)
+end
+function lvfindmax(A::AbstractArray{T, N}, dims::NTuple{M, Int}) where {T, N, M}
+    # Dᴮ′ = ntuple(d -> d ∈ dims ? StaticInt(1) : size(A, d), N)
+    Dᴮ = ntuple(d -> d ∈ dims ? 1 : size(A, d), N)
+    Dᴮ′ = ntuple(d -> d ∈ dims ? Val(1) : size(A, d), N)
+    B = similar(A, Dᴮ)
+    C = similar(B, Int)
+    _findmax!(C, A, B, Dᴮ′)
+    B, CartesianIndices(A)[C]
+end
+
+@benchmark findmax(A, dims=dims)
+@benchmark lvfindmax5(A, dims)
+
+@benchmark lvfindmax(A, dims)
