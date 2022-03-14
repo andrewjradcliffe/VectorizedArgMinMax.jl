@@ -129,21 +129,21 @@ function findmax_quote(N::Int, D)
         $outerloops
     end
 end
-@generated function _findmax!(C::AbstractArray{Tₒ, N}, A::AbstractArray{T, N},
+@generated function _bfindmax!(C::AbstractArray{Tₒ, N}, A::AbstractArray{T, N},
                              B::AbstractArray{T, N}, dims::D) where {Tₒ, T, N, D}
     findmax_quote(N, D)
 end
-function lvfindmax(A::AbstractArray{T, N}, dims::NTuple{M, Int}) where {T, N, M}
+function bfindmax(A::AbstractArray{T, N}, dims::NTuple{M, Int}) where {T, N, M}
     # Dᴮ′ = ntuple(d -> d ∈ dims ? StaticInt(1) : size(A, d), N)
     Dᴮ = ntuple(d -> d ∈ dims ? 1 : size(A, d), N)
     Dᴮ′ = ntuple(d -> d ∈ dims ? Val(1) : size(A, d), N)
     B = similar(A, Dᴮ)
     C = similar(B, Int)
-    _findmax!(C, A, B, Dᴮ′)
+    _bfindmax!(C, A, B, Dᴮ′)
     B, CartesianIndices(A)[C]
 end
 
 @benchmark findmax(A, dims=dims)
 @benchmark lvfindmax5(A, dims)
 
-@benchmark lvfindmax(A, dims)
+@benchmark bfindmax(A, dims)
