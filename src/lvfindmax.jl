@@ -80,13 +80,36 @@ function innerpost(N::Int, D)
     push!(block.args, e2)
     block
 end
+function innerpost2(N::Int, D)
+    params = D.parameters
+    block = Expr(:block)
+    b = Expr(:ref, :B, (Symbol(:i_, d) for d = 1:N if params[d] !== Static.One)...)
+    c = Expr(:ref, :C, (Symbol(:i_, d) for d = 1:N if params[d] !== Static.One)...)
+    e1 = Expr(:(=), b, :m)
+    e2 = Expr(:(=), c, :j)
+    push!(block.args, e1)
+    push!(block.args, e2)
+    block
+end
 
-function compareblock(f, N::Int)
+function innerpost2_leading1(N::Int, D)
+    params = D.parameters
+    block = Expr(:block)
+    b = Expr(:ref, :B, ntuple(d -> params[d] === Static.One ? 1 : Symbol(:i_, d), N)[2:N]...)
+    c = Expr(:ref, :C, ntuple(d -> params[d] === Static.One ? 1 : Symbol(:i_, d), N)[2:N]...)
+    e1 = Expr(:(=), b, :m)
+    e2 = Expr(:(=), c, :j)
+    push!(block.args, e1)
+    push!(block.args, e2)
+    block
+end
+
+function maxcompareblock(N::Int)
     block = Expr(:block)
     a = Expr(:ref, :A, ntuple(d -> Symbol(:i_, d), N)...)
     d = sumprodprecomputed2(N)
     push!(d.args, :D_sp)
-    yₑ = Expr(:(=), :y, Expr(:call, Symbol(f), a, :m)) # f should only be > or <
+    yₑ = Expr(:(=), :y, Expr(:call, :(>), a, :m)) # f should only be > or <
     mₑ = Expr(:(=), :m, Expr(:if, :y, a, :m))
     jₑ = Expr(:(=), :j, Expr(:if, :y, d, :j))
     push!(block.args, yₑ)
@@ -95,14 +118,40 @@ function compareblock(f, N::Int)
     block
 end
 
-function findmax_quote(N::Int, D)
+function maxcompareblock2(N::Int)
+    block = Expr(:block)
+    a = Expr(:ref, :A, ntuple(d -> Symbol(:i_, d), N)...)
+    d = sumprodprecomputed2(N)
+    push!(d.args, :D_sp)
+    yₑ = Expr(:(=), :y, Expr(:call, :(>), a, :m)) # f should only be > or <
+    mₑ = Expr(:(=), :m, Expr(:call, :ifelse, :y, a, :m))
+    jₑ = Expr(:(=), :j, Expr(:call, :ifelse, :y, d, :j))
+    push!(block.args, yₑ)
+    push!(block.args, mₑ)
+    push!(block.args, jₑ)
+    block
+end
+
+# function maxcompareblock3(N::Int, D)
+#     block = Expr(:block)
+#     params = D.parameters
+#     a = Expr(:ref, :A, ntuple(d -> Symbol(:i_, d), N)...)
+#     # b = Expr(:ref, :B, ntuple(d -> params[d] === Static.One ? 1 : Symbol(:i_, d), N)...)
+#     d = sumprodprecomputed2(N)
+#     push!(d.args, :D_sp)
+#     jₑ = Expr(:(=), :j, Expr(:call, :ifelse, Expr(:call, :(>=), a, :m), d, :j))
+#     push!(block.args, jₑ)
+#     block
+# end
+
+function lvfindmax_quote(N::Int, D)
     block1 = sizeblock(N)
     block2 = sizeproductsblock(N)
     block3 = Expr(:block, sumprodconstant(N), Expr(:(=), :D_sp, Expr(:call, :-, :D_sp)))
     outerloops = outerloopgen(N, D)
     block4 = Expr(:block, Expr(:(=), :j, 1), Expr(:(=), :m, Expr(:call, :typemin, :T)))
     innerloops = innerloopgen(N, D)
-    block5 = compareblock(N, D)
+    block5 = maxcompareblock(N)
     push!(innerloops.args, block5)
     push!(block4.args, innerloops)
     block6 = innerpost(N, D)
@@ -112,24 +161,125 @@ function findmax_quote(N::Int, D)
         $block1
         $block2
         $block3
-        $outerloops
+        @turbo $outerloops
     end
 end
-@generated function _bfindmax!(C::AbstractArray{Tₒ, N}, A::AbstractArray{T, N},
+@generated function _lvfindmax!(C::AbstractArray{Tₒ, N}, A::AbstractArray{T, N},
                              B::AbstractArray{T, N}, dims::D) where {Tₒ, T, N, D}
-    findmax_quote(N, D)
+    lvfindmax_quote(N, D)
 end
-function bfindmax(A::AbstractArray{T, N}, dims::NTuple{M, Int}) where {T, N, M}
-    # Dᴮ′ = ntuple(d -> d ∈ dims ? StaticInt(1) : size(A, d), N)
-    Dᴮ = ntuple(d -> d ∈ dims ? 1 : size(A, d), N)
-    Dᴮ′ = ntuple(d -> d ∈ dims ? Val(1) : size(A, d), N)
-    B = similar(A, Dᴮ)
+function lvfindmax(A::AbstractArray{T, N}, dims::NTuple{M, Int}) where {T, N, M}
+    Dᴮ′ = ntuple(d -> d ∈ dims ? StaticInt(1) : size(A, d), N)
+    B = similar(A, Dᴮ′)
     C = similar(B, Int)
-    _bfindmax!(C, A, B, Dᴮ′)
+    _lvfindmax!(C, A, B, Dᴮ′)
+    B, CartesianIndices(A)[C]
+end
+function lvfindmax_quote2(N::Int, D)
+    block1 = sizeblock(N)
+    block2 = sizeproductsblock(N)
+    block3 = Expr(:block, sumprodconstant(N), Expr(:(=), :D_sp, Expr(:call, :-, :D_sp)))
+    outerloops = outerloopgen(N, D)
+    block4 = Expr(:block, Expr(:(=), :j, 1), Expr(:(=), :m, Expr(:call, :typemin, :T)))
+    innerloops = innerloopgen(N, D)
+    block5 = maxcompareblock2(N)
+    push!(innerloops.args, block5)
+    push!(block4.args, innerloops)
+    block6 = innerpost(N, D)
+    push!(block4.args, block6.args...)
+    push!(outerloops.args, block4)
+    return quote
+        $block1
+        $block2
+        $block3
+        @turbo $outerloops
+    end
+end
+@generated function _lvfindmax2!(C::AbstractArray{Tₒ, N}, A::AbstractArray{T, N},
+                             B::AbstractArray{T, N}, dims::D) where {Tₒ, T, N, D}
+    lvfindmax_quote2(N, D)
+end
+function lvfindmax2(A::AbstractArray{T, N}, dims::NTuple{M, Int}) where {T, N, M}
+    Dᴮ′ = ntuple(d -> d ∈ dims ? StaticInt(1) : size(A, d), N)
+    B = similar(A, Dᴮ′)
+    C = similar(B, Int)
+    _lvfindmax2!(C, A, B, Dᴮ′)
     B, CartesianIndices(A)[C]
 end
 
+function lvfindmax_quote3(N::Int, D)
+    block1 = sizeblock(N)
+    block2 = sizeproductsblock(N)
+    block3 = Expr(:block, sumprodconstant(N), Expr(:(=), :D_sp, Expr(:call, :-, :D_sp)))
+    outerloops = outerloopgen(N, D)
+    block4 = Expr(:block, Expr(:(=), :j, 1), Expr(:(=), :m, Expr(:call, :typemin, :T)))
+    innerloops = innerloopgen(N, D)
+    block5 = maxcompareblock2(N)
+    push!(innerloops.args, block5)
+    push!(block4.args, innerloops)
+    block6 = D.parameters[1] === StaticInt{1} ? innerpost2_leading1(N, D) : innerpost(N, D)
+    push!(block4.args, block6.args...)
+    push!(outerloops.args, block4)
+    return quote
+        $block1
+        $block2
+        $block3
+        @turbo $outerloops
+    end
+end
+@generated function _lvfindmax3!(C::AbstractArray{Tₒ, M}, A::AbstractArray{T, N},
+                                 B::AbstractArray{T, M}, dims::D) where {Tₒ, M, T, N, D}
+    lvfindmax_quote3(N, D)
+end
+function lvfindmax3(A::AbstractArray{T, N}, dims::NTuple{M, Int}) where {T, N, M}
+    if 1 ∈ dims
+        Dᴮ′ = ntuple(d -> d ∈ dims ? StaticInt(1) : size(A, d), N)
+        Dᴮ = ntuple(d -> d + 1 ∈ dims ? StaticInt(1) : size(A, d), N - 1)
+        B = similar(A, Dᴮ)
+        C = similar(B, Int)
+        _lvfindmax3!(C, A, B, Dᴮ′)
+        return reshape(B, Dᴮ′), CartesianIndices(A)[reshape(C, Dᴮ′)]
+    else
+        Dᴮ′ = ntuple(d -> d ∈ dims ? StaticInt(1) : size(A, d), N)
+        B = similar(A, Dᴮ′)
+        C = similar(B, Int)
+        _lvfindmax2!(C, A, B, Dᴮ′)
+        return B, CartesianIndices(A)[C]
+    end
+end
+
+A = rand(4, 3, 5);
+
 @benchmark findmax(A, dims=dims)
-@benchmark lvfindmax5(A, dims)
 
 @benchmark bfindmax(A, dims)
+
+@benchmark lvfindmax(A, dims)
+@benchmark lvfindmax2(A, dims)
+@benchmark lvfindmax3(A, dims)
+
+N = ndims(A)
+DD = typeof(ntuple(d -> d ∈ dims ? StaticInt(1) : size(A, d), N))
+lvfindmax_quote(N, DD)
+lvfindmax_quote2(N, DD)
+lvfindmax_quote3(N, DD)
+lvfindmax3(A, dims) == findmax(A, dims=dims)
+
+lvfindmax(A, (1,))
+findmax(A, dims=dims)
+
+dims=(2,)
+dims=(1,)
+dims=(2,3)
+dims=(2,3,4,5)
+
+for d₂ = 2:ndims(A), d₁ = 2:ndims(A)
+    dims = (d₁, d₂)
+    @assert lvfindmax2(A, dims) == findmax(A, dims=dims)
+    @assert lvfindmax3(A, dims) == findmax(A, dims=dims)
+end
+
+@benchmark bfindmax(A, dims)
+@benchmark findmax(A, dims=dims)
+A = rand(10, 100, 1000);
+dims = (1,)
