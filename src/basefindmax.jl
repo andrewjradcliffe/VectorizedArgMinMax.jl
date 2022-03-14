@@ -40,15 +40,6 @@ end
 function sumprodconstant(N::Int)
     Expr(:(=), :D_sp,
          Expr(:call, :+, ntuple(d -> Expr(:call, :*, ntuple(i -> Symbol(:D_, i), d)...), N - 1)...))
-    # # # Equivalent, but perhaps more clear
-    # e = Expr(:(=), :D_sp)
-    # r = Expr(:call, :+)
-    # for k = 1:(N - 1)
-    #     ex = Expr(:call, :*, ntuple(d -> Symbol(:D_, d), k)...)
-    #     push!(r.args, ex)
-    # end
-    # push!(e.args, r)
-    # e
 end
 
 function outerloopgen(N::Int, D)
@@ -56,7 +47,6 @@ function outerloopgen(N::Int, D)
     block = Expr(:block)
     params = D.parameters
     for d = N:-1:1
-        # if params[d] != Static.One
         if params[d] !== Val{1}
             ex = Expr(:(=), Symbol(:i_, d), Expr(:call, :axes, :A, d))
             push!(block.args, ex)
@@ -70,7 +60,6 @@ function innerloopgen(N::Int, D)
     block = Expr(:block)
     params = D.parameters
     for d = N:-1:1
-        # if params[d] == Static.One
         if params[d] === Val{1}
             ex = Expr(:(=), Symbol(:i_, d), Expr(:call, :axes, :A, d))
             push!(block.args, ex)
@@ -83,8 +72,6 @@ end
 function innerpost(N::Int, D)
     params = D.parameters
     block = Expr(:block)
-    # b = Expr(:ref, :B, ntuple(d -> params[d] == Static.One ? 1 : Symbol(:i_, d), N)...)
-    # c = Expr(:ref, :C, ntuple(d -> params[d] == Static.One ? 1 : Symbol(:i_, d), N)...)
     b = Expr(:ref, :B, ntuple(d -> params[d] === Val{1} ? 1 : Symbol(:i_, d), N)...)
     c = Expr(:ref, :C, ntuple(d -> params[d] === Val{1} ? 1 : Symbol(:i_, d), N)...)
     e1 = Expr(:(=), b, :m)
@@ -94,11 +81,10 @@ function innerpost(N::Int, D)
     block
 end
 
-function compareblock(N::Int, D)
+function compareblock(N::Int)
     block = Expr(:block)
-    params = D.parameters
     a = Expr(:ref, :A, ntuple(d -> Symbol(:i_, d), N)...)
-    d = sumprodprecomputed(N)
+    d = sumprodprecomputed2(N)
     push!(d.args, :D_sp)
     yₑ = Expr(:(=), :y, Expr(:call, :(>), a, :m))
     mₑ = Expr(:(=), :m, Expr(:if, :y, a, :m))
