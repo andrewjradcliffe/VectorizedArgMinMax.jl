@@ -66,15 +66,6 @@ function binnerloopgen(N::Int, D)
 end
 
 function binnerpost(N::Int, D)
-    # params = D.parameters
-    # block = Expr(:block)
-    # b = Expr(:ref, :B, ntuple(d -> params[d] === Val{1} ? 1 : Symbol(:i_, d), N)...)
-    # c = Expr(:ref, :C, ntuple(d -> params[d] === Val{1} ? 1 : Symbol(:i_, d), N)...)
-    # e1 = Expr(:(=), b, :m)
-    # e2 = Expr(:(=), c, :j)
-    # push!(block.args, e1)
-    # push!(block.args, e2)
-    # block
     params = D.parameters
     b = Expr(:ref, :B, ntuple(d -> params[d] === Val{1} ? 1 : Symbol(:i_, d), N)...)
     c = Expr(:ref, :C, ntuple(d -> params[d] === Val{1} ? 1 : Symbol(:i_, d), N)...)
@@ -129,3 +120,8 @@ end
 @benchmark findmax(A, dims=dims)
 
 @benchmark bfindmax(A, dims)
+
+for d₂ = 2:ndims(A), d₁ = 2:ndims(A)
+    dims = (d₁, d₂)
+    @assert bfindmax(A, dims) == findmax(A, dims=dims)
+end
