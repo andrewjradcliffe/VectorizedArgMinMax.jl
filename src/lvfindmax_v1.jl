@@ -361,12 +361,14 @@ function lvfindmax5(A::AbstractArray{T, N}, dims::NTuple{M, Int}) where {T, N, M
     B = similar(A, Dᴮ′)
     C = similar(B, Int)
     findmax5!(C, A, B, Dᴮ′)
-    C
+    B, CartesianIndices(A)[C]
 end
 C5 = lvfindmax5(A, dims)
 CartesianIndices(A)[C5] == argmax(A, dims=dims)
-@benchmark lvfindmax5(A, dims)
-@benchmark findmax(A, dims=dims)
+lvfindmax5(A, dims)
+findmax(A, dims=dims)
+lvfindmax5(A, dims) == findmax(A, dims=dims)
+
 
 function lvfindequal(A::AbstractArray{T, 3}, B::AbstractArray{T, 3}) where {T}
     C = similar(B, Int)
