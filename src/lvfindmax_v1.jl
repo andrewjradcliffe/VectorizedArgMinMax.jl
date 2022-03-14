@@ -159,6 +159,19 @@ function compareblock4(N::Int, D)
     block
 end
 
+function compareblock6(N::Int, D)
+    block = Expr(:block)
+    params = D.parameters
+    a = Expr(:ref, :A, ntuple(d -> Symbol(:i_, d), N)...)
+    b = Expr(:ref, :B, ntuple(d -> params[d] == Static.One ? 1 : Symbol(:i_, d), N)...)
+    c = Expr(:ref, :C, ntuple(d -> params[d] == Static.One ? 1 : Symbol(:i_, d), N)...)
+    d = sumprodprecomputed2(N)
+    push!(d.args, :D_sp)
+    e = Expr(:(=), c, Expr(:call, :ifelse, Expr(:call, :(==), a, b), d, c))
+    push!(block.args, e)
+    block
+end
+
 # p. 26
 function outerloopgen(N::Int, D)
     loops = Expr(:for)
@@ -288,6 +301,22 @@ function findequal_quote4(N::Int, D)
     end
 end
 
+function findequal_quote6(N::Int, D)
+    loops = loopgen(N)
+    block1 = sizeblock(N)
+    block2 = sizeproductsblock(N)
+    block3 = Expr(:block, sumprodconstant(N), Expr(:(=), :D_sp, Expr(:call, :-, :D_sp)))
+    block4 = compareblock6(N, D)
+    push!(loops.args, block4)
+    return quote
+        $block1
+        $block2
+        $block3
+        @turbo $loops
+    end
+end
+
+
 @generated function findequal!(C::AbstractArray{Tₒ, N}, A::AbstractArray{T, N},
                                B::AbstractArray{T, N}, dims::D) where {Tₒ, T, N, D}
     findequal_quote2(N, D)
@@ -306,6 +335,11 @@ end
     findmax5_quote(N, D)
 end
 
+@generated function findequal6!(C::AbstractArray{Tₒ, N}, A::AbstractArray{T, N},
+                                B::AbstractArray{T, N}, dims::D) where {Tₒ, T, N, D}
+    findequal_quote6(N, D)
+end
+
 A = reshape([1:(4*3*5);], 4, 3, 5);
 A = rand(1:10, 4, 3, 5);
 dims = (2,);
@@ -313,6 +347,7 @@ Dᴮ′ = ntuple(d -> d ∈ dims ? StaticInt(1) : size(A, d), ndims(A));
 findequal_quote(ndims(A), typeof(Dᴮ′))
 findequal_quote2(ndims(A), typeof(Dᴮ′))
 findequal_quote3(ndims(A), typeof(Dᴮ′))
+findequal_quote6(ndims(A), typeof(Dᴮ′))
 findmax5_quote(ndims(A), typeof(Dᴮ′))
 
 # C0 = deepcopy(C);
@@ -355,6 +390,16 @@ LinearIndices(A)[argmax(A, dims=dims)]
 # end
 # C4 = lvfindmax4(A, dims)
 # reshape(findall(C4), size(B)) == argmax(A, dims=dims) == reshape(CartesianIndices(A)[C4], size(B))
+
+function lvfindmax6(A::AbstractArray{T, N}, dims::NTuple{M, Int}) where {T, N, M}
+    B = maximum(A, dims=dims)
+    Dᴮ′ = ntuple(d -> d ∈ dims ? StaticInt(1) : size(A, d), N)
+    C = ones(Int, size(B))
+    findequal6!(C, A, B, Dᴮ′)
+    B, CartesianIndices(A)[C]
+end
+B6, C6 = lvfindmax6(A, dims)
+lvfindmax6(A, dims) == findmax(A, dims=dims)
 
 function lvfindmax5(A::AbstractArray{T, N}, dims::NTuple{M, Int}) where {T, N, M}
     Dᴮ′ = ntuple(d -> d ∈ dims ? StaticInt(1) : size(A, d), N)
