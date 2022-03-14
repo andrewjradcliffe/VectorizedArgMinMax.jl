@@ -42,8 +42,7 @@ function sumprodconstant(N::Int)
          Expr(:call, :+, ntuple(d -> Expr(:call, :*, ntuple(i -> Symbol(:D_, i), d)...), N - 1)...))
 end
 
-function outerloopgen(N::Int, D)
-    loops = Expr(:for)
+function bouterloopgen(N::Int, D)
     block = Expr(:block)
     params = D.parameters
     for d = N:-1:1
@@ -52,11 +51,9 @@ function outerloopgen(N::Int, D)
             push!(block.args, ex)
         end
     end
-    push!(loops.args, block)
-    loops
+    Expr(:for, block)
 end
-function innerloopgen(N::Int, D)
-    loops = Expr(:for)
+function binnerloopgen(N::Int, D)
     block = Expr(:block)
     params = D.parameters
     for d = N:-1:1
@@ -65,47 +62,48 @@ function innerloopgen(N::Int, D)
             push!(block.args, ex)
         end
     end
-    push!(loops.args, block)
-    loops
+    Expr(:for, block)
 end
 
-function innerpost(N::Int, D)
+function binnerpost(N::Int, D)
+    # params = D.parameters
+    # block = Expr(:block)
+    # b = Expr(:ref, :B, ntuple(d -> params[d] === Val{1} ? 1 : Symbol(:i_, d), N)...)
+    # c = Expr(:ref, :C, ntuple(d -> params[d] === Val{1} ? 1 : Symbol(:i_, d), N)...)
+    # e1 = Expr(:(=), b, :m)
+    # e2 = Expr(:(=), c, :j)
+    # push!(block.args, e1)
+    # push!(block.args, e2)
+    # block
     params = D.parameters
-    block = Expr(:block)
     b = Expr(:ref, :B, ntuple(d -> params[d] === Val{1} ? 1 : Symbol(:i_, d), N)...)
     c = Expr(:ref, :C, ntuple(d -> params[d] === Val{1} ? 1 : Symbol(:i_, d), N)...)
-    e1 = Expr(:(=), b, :m)
-    e2 = Expr(:(=), c, :j)
-    push!(block.args, e1)
-    push!(block.args, e2)
-    block
+    Expr(:block, Expr(:(=), b, :m), Expr(:(=), c, :j))
 end
 
 function compareblock(f, N::Int)
-    block = Expr(:block)
     a = Expr(:ref, :A, ntuple(d -> Symbol(:i_, d), N)...)
     d = sumprodprecomputed2(N)
     push!(d.args, :D_sp)
     yₑ = Expr(:(=), :y, Expr(:call, Symbol(f), a, :m)) # f should only be > or <
     mₑ = Expr(:(=), :m, Expr(:if, :y, a, :m))
     jₑ = Expr(:(=), :j, Expr(:if, :y, d, :j))
-    push!(block.args, yₑ)
-    push!(block.args, mₑ)
-    push!(block.args, jₑ)
-    block
+    # mₑ = Expr(:(=), :m, Expr(:call, :ifelse, :y, a, :m))
+    # jₑ = Expr(:(=), :j, Expr(:call, :ifelse, :y, d, :j))
+    Expr(:block, yₑ, mₑ, jₑ)
 end
 
 function findmax_quote(N::Int, D)
     block1 = sizeblock(N)
     block2 = sizeproductsblock(N)
     block3 = Expr(:block, sumprodconstant(N), Expr(:(=), :D_sp, Expr(:call, :-, :D_sp)))
-    outerloops = outerloopgen(N, D)
+    outerloops = bouterloopgen(N, D)
     block4 = Expr(:block, Expr(:(=), :j, 1), Expr(:(=), :m, Expr(:call, :typemin, :T)))
-    innerloops = innerloopgen(N, D)
-    block5 = compareblock(N, D)
+    innerloops = binnerloopgen(N, D)
+    block5 = compareblock(>, N)
     push!(innerloops.args, block5)
     push!(block4.args, innerloops)
-    block6 = innerpost(N, D)
+    block6 = binnerpost(N, D)
     push!(block4.args, block6.args...)
     push!(outerloops.args, block4)
     return quote
@@ -115,21 +113,19 @@ function findmax_quote(N::Int, D)
         $outerloops
     end
 end
-@generated function _bfindmax!(C::AbstractArray{Tₒ, N}, A::AbstractArray{T, N},
-                             B::AbstractArray{T, N}, dims::D) where {Tₒ, T, N, D}
+@generated function _bfindmax!(B::AbstractArray{T, N}, C::AbstractArray{Tₒ, N},
+                               A::AbstractArray{T, N}, dims::D) where {T, Tₒ, N, D}
     findmax_quote(N, D)
 end
 function bfindmax(A::AbstractArray{T, N}, dims::NTuple{M, Int}) where {T, N, M}
-    # Dᴮ′ = ntuple(d -> d ∈ dims ? StaticInt(1) : size(A, d), N)
     Dᴮ = ntuple(d -> d ∈ dims ? 1 : size(A, d), N)
     Dᴮ′ = ntuple(d -> d ∈ dims ? Val(1) : size(A, d), N)
     B = similar(A, Dᴮ)
     C = similar(B, Int)
-    _bfindmax!(C, A, B, Dᴮ′)
+    _bfindmax!(B, C, A, Dᴮ′)
     B, CartesianIndices(A)[C]
 end
 
 @benchmark findmax(A, dims=dims)
-@benchmark lvfindmax5(A, dims)
 
 @benchmark bfindmax(A, dims)
