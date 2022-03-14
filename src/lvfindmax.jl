@@ -132,6 +132,22 @@ function compareblock2(N::Int, D)
     block
 end
 
+# function compareblock3(N::Int, D)
+#     block = Expr(:block)
+#     params = D.parameters
+#     a = Expr(:ref, :A, ntuple(d -> Symbol(:i_, d), N)...)
+#     b = Expr(:ref, :B, ntuple(d -> params[d] == Static.One ? 1 : Symbol(:i_, d), N)...)
+#     c = Expr(:ref, :C, ntuple(d -> params[d] == Static.One ? 1 : Symbol(:i_, d), N)...)
+#     d = sumprodprecomputed2(N)
+#     push!(d.args, :D_sp)
+#     # e = Expr(:if, Expr(:call, :(==), a, b), Expr(:(=), c, d))
+#     j = Expr(:(=), :j, c)
+#     e = Expr(:(=), c, Expr(:if, Expr(:call, :(==), a, b), d, :j))
+#     push!(block.args, j)
+#     push!(block.args, e)
+#     block
+# end
+
 function findequal_quote(N::Int, D)
     loops = loopgen(N)
     block1 = sizeblock(N)
@@ -154,14 +170,32 @@ function findequal_quote2(N::Int, D)
         $block1
         $block2
         $block3
-        $loops
+        @turbo $loops
     end
 end
+# function findequal_quote3(N::Int, D)
+#     loops = loopgen(N)
+#     block1 = sizeblock(N)
+#     block2 = sizeproductsblock(N)
+#     block3 = Expr(:block, sumprodconstant(N), Expr(:(=), :D_sp, Expr(:call, :-, :D_sp)))
+#     block4 = compareblock3(N, D)
+#     push!(loops.args, block4)
+#     return quote
+#         $block1
+#         $block2
+#         $block3
+#         @turbo $loops
+#     end
+# end
 
 @generated function findequal!(C::AbstractArray{Tₒ, N}, A::AbstractArray{T, N},
                                B::AbstractArray{T, N}, dims::D) where {Tₒ, T, N, D}
     findequal_quote2(N, D)
 end
+# @generated function findequal3!(C::AbstractArray{Tₒ, N}, A::AbstractArray{T, N},
+#                                B::AbstractArray{T, N}, dims::D) where {Tₒ, T, N, D}
+#     findequal_quote3(N, D)
+# end
 
 
 A = reshape([1:(4*3*5);], 4, 3, 5);
@@ -169,6 +203,7 @@ dims = (2,);
 Dᴮ′ = ntuple(d -> d ∈ dims ? StaticInt(1) : size(A, d), ndims(A));
 findequal_quote(ndims(A), typeof(Dᴮ′))
 findequal_quote2(ndims(A), typeof(Dᴮ′))
+findequal_quote3(ndims(A), typeof(Dᴮ′))
 
 # C0 = deepcopy(C);
 B = maximum(A, dims=dims);
@@ -178,11 +213,25 @@ CartesianIndices(A)[C] == argmax(A, dims=dims)
 
 compareblock(ndims(A), typeof(Dᴮ′))
 compareblock2(ndims(A), typeof(Dᴮ′))
+compareblock3(ndims(A), typeof(Dᴮ′))
 
 function lvfindmax(A::AbstractArray{T, N}, dims::NTuple{M, Int}) where {T, N, M}
     B = lvmaximum(A, dims=dims)
     Dᴮ′ = ntuple(d -> d ∈ dims ? StaticInt(1) : size(A, d), N)
     C = ones(Int, size(B))
-    findequal!(C, A, B)
+    findequal!(C, A, B, Dᴮ′)
     C
 end
+C2 = lvfindmax(A, dims)
+
+CartesianIndices(A)[C2] == argmax(A, dims=dims)
+LinearIndices(A)[argmax(A, dims=dims)]
+
+# function lvfindmax3(A::AbstractArray{T, N}, dims::NTuple{M, Int}) where {T, N, M}
+#     B = lvmaximum(A, dims=dims)
+#     Dᴮ′ = ntuple(d -> d ∈ dims ? StaticInt(1) : size(A, d), N)
+#     C = ones(Int, size(B))
+#     findequal3!(C, A, B, Dᴮ′)
+#     C
+# end
+# C3 = lvfindmax3(A, dims)
