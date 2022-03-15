@@ -157,11 +157,19 @@ function bfindmax(A::AbstractArray{T, N}, dims::NTuple{M, Int}) where {T, N, M}
     B, CartesianIndices(A)[C]
 end
 
+A = rand(4, 3, 5);
+dims = (2,3)
+using BenchmarkTools
 @benchmark findmax(A, dims=dims)
-
 @benchmark bfindmax(A, dims)
+@benchmark bfindmax0(A, dims)
+bfindmax0(A, dims) == findmax(A, dims=dims) == bfindmax(A, dims)
 
-for d₂ = 2:ndims(A), d₁ = 2:ndims(A)
+for d₂ = 1:ndims(A), d₁ = 1:ndims(A)
     dims = (d₁, d₂)
     @assert bfindmax(A, dims) == findmax(A, dims=dims)
 end
+DD = typeof(ntuple(d -> d ∈ dims ? Val(1) : size(A, d), ndims(A)))
+findmax_quote0(ndims(A), DD)
+findmax_quote(ndims(A), DD)
+compareblock0(>, ndims(A), DD)
