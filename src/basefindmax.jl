@@ -77,11 +77,51 @@ function compareblock(f, N::Int)
     d = sumprodprecomputed2(N)
     push!(d.args, :D_sp)
     yₑ = Expr(:(=), :y, Expr(:call, Symbol(f), a, :m)) # f should only be > or <
-    mₑ = Expr(:(=), :m, Expr(:if, :y, a, :m))
-    jₑ = Expr(:(=), :j, Expr(:if, :y, d, :j))
-    # mₑ = Expr(:(=), :m, Expr(:call, :ifelse, :y, a, :m))
-    # jₑ = Expr(:(=), :j, Expr(:call, :ifelse, :y, d, :j))
+    # mₑ = Expr(:(=), :m, Expr(:if, :y, a, :m))
+    # jₑ = Expr(:(=), :j, Expr(:if, :y, d, :j))
+    mₑ = Expr(:(=), :m, Expr(:call, :ifelse, :y, a, :m))
+    jₑ = Expr(:(=), :j, Expr(:call, :ifelse, :y, d, :j))
     Expr(:block, yₑ, mₑ, jₑ)
+end
+
+function compareblock0(f, N::Int, D)
+    params = D.parameters
+    a = Expr(:ref, :A, ntuple(d -> Symbol(:i_, d), N)...)
+    b = Expr(:ref, :B, ntuple(d -> params[d] === Val{1} ? 1 : Symbol(:i_, d), N)...)
+    c = Expr(:ref, :C, ntuple(d -> params[d] === Val{1} ? 1 : Symbol(:i_, d), N)...)
+    d = sumprodprecomputed2(N)
+    push!(d.args, :D_sp)
+    yₑ = Expr(:(=), :y, Expr(:call, Symbol(f), a, b)) # f should only be > or <
+    bₑ = Expr(:(=), b, Expr(:call, :ifelse, :y, a, b))
+    cₑ = Expr(:(=), c, Expr(:call, :ifelse, :y, d, c))
+    Expr(:block, yₑ, bₑ, cₑ)
+end
+
+function findmax_quote0(N::Int, D)
+    loops = loopgen(N)
+    b1 = sizeblock(N)
+    b2 = sizeproductsblock(N)
+    b3 = Expr(:block, sumprodconstant(N), Expr(:(=), :D_sp, Expr(:call, :-, :D_sp)))
+    b4 = compareblock0(>, N, D)
+    push!(loops.args, b4)
+    return quote
+        $b1
+        $b2
+        $b3
+        $loops
+    end
+end
+@generated function _bfindmax0!(B::AbstractArray{T, N}, C::AbstractArray{Tₒ, N},
+                                A::AbstractArray{T, N}, dims::D) where {T, Tₒ, N, D}
+    findmax_quote0(N, D)
+end
+function bfindmax0(A::AbstractArray{T, N}, dims::NTuple{M, Int}) where {T, N, M}
+    Dᴮ = ntuple(d -> d ∈ dims ? 1 : size(A, d), N)
+    Dᴮ′ = ntuple(d -> d ∈ dims ? Val(1) : size(A, d), N)
+    B = fill(typemin(T), Dᴮ)
+    C = similar(B, Int)
+    _bfindmax0!(B, C, A, Dᴮ′)
+    B, CartesianIndices(A)[C]
 end
 
 function findmax_quote(N::Int, D)
