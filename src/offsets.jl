@@ -35,3 +35,125 @@ partialterm(J::NTuple{N, Int}) where {N} =
     Expr(:call, :+, ntuple(d -> J[d] == 1 ? :i_1 :
     Expr(:call, :*, Symbol(:D_, ntuple(identity, J[d] - 1)...), Symbol(:i_, J[d])), N)...)
 
+function preexprmax(J::NTuple{N, Int}) where {N}
+    block = Expr(:block, Expr(:(=), :m, Expr(:call, :typemin, :T)))
+    ex = partialterm(J)
+    push!(ex.args, 1, :Dstar)
+    push!(block.args, Expr(:(=), :j, ex))
+    block
+end
+function preexprmax2(J::NTuple{N, Int}) where {N}
+    Expr(:block, Expr(:(=), :m, Expr(:call, :typemin, :T)), Expr(:(=), :j, 0))
+end
+
+function findmax_quote(N::Int, D)
+    b1 = sizeblock(N)
+    b2 = Expr(:block, ntuple(d -> offsetk(d + 2), N - 2)...)
+    b3 = Expr(:block, totaloffsetraw(N), Expr(:(=), :Dstar, Expr(:call, :-, :Dstar)))
+    b4 = preexprmax(tuple((d for d = 1:N if D.parameters[d] !== Val{1})...))
+    inner = innerloop(N, D)
+    push!(inner.args, maxblock(N, D))
+    push!(b4.args, inner)
+    push!(b4.args, postexpr(N, D).args...)
+    outer = outerloop(N, D)
+    push!(outer.args, b4)
+    return quote
+        $b1
+        $b2
+        $b3
+        $outer
+    end
+end
+function findmax_quote2(N::Int, D)
+    b1 = sizeblock(N)
+    b2 = Expr(:block, ntuple(d -> offsetk(d + 2), N - 2)...)
+    b3 = Expr(:block, totaloffsetraw(N), Expr(:(=), :Dstar, Expr(:call, :-, :Dstar)))
+    b4 = preexprmax2(tuple((d for d = 1:N if D.parameters[d] !== Val{1})...))
+    inner = innerloop(N, D)
+    push!(inner.args, maxblock2(N, D))
+    push!(b4.args, inner)
+    push!(b4.args, postexpr(N, D).args...)
+    outer = outerloop(N, D)
+    push!(outer.args, b4)
+    return quote
+        $b1
+        $b2
+        $b3
+        @tturbo $outer
+    end
+end
+function findmax_quote3(N::Int, D)
+    b1 = sizeblock(N)
+    b2 = Expr(:block, ntuple(d -> offsetk(d + 2), N - 2)...)
+    b3 = Expr(:block, totaloffsetraw(N), Expr(:(=), :Dstar, Expr(:call, :-, :Dstar)))
+    b4 = preexprmax2(tuple((d for d = 1:N if D.parameters[d] !== Val{1})...))
+    inner = innerloop(N, D)
+    push!(inner.args, maxblock3(N, D))
+    push!(b4.args, inner)
+    push!(b4.args, postexpr3(N, D).args...)
+    outer = outerloop(N, D)
+    push!(outer.args, b4)
+    return quote
+        $b1
+        $b2
+        $b3
+        @tturbo $outer
+    end
+end
+
+D_1 = 4
+D_2 = 3
+D_3 = 2
+N = 3
+dd = typeof((D_1, Val(1), D_3))
+findmax_quote(N, dd)
+findmax_quote2(N, dd)
+maxblock(N, dd)
+maxblock2(N, dd)
+
+A = reshape([1:24;], D_1, D_2, D_3);
+dims = (2,)
+Dᴮ = ntuple(d -> d ∈ dims ? 1 : size(A, d), N)
+Dᴮ′ = ntuple(d -> d ∈ dims ? Val(1) : size(A, d), N)
+T = eltype(A)
+B = similar(A, Int, Dᴮ);
+C = similar(A, Dᴮ);
+ex = findmax_quote(N, typeof(Dᴮ′))
+ex2 = findmax_quote2(N, typeof(Dᴮ′))
+ex3 = findmax_quote3(N, typeof(Dᴮ′))
+eval(ex2)
+eval(ex3)
+CartesianIndices(A)[C] == argmax(A, dims=dims)
+
+@generated _vfindmax2!(B::AbstractArray{T, N}, C::AbstractArray{Tₒ, N},
+                       A::AbstractArray{T, N}, dims::D) where {T, Tₒ, N, D} = findmax_quote2(N, D)
+function vfindmax2(A::AbstractArray{T, N}, dims::NTuple{M, Int}) where {T, N, M}
+    Dᴮ = ntuple(d -> d ∈ dims ? 1 : size(A, d), N)
+    Dᴮ′ = ntuple(d -> d ∈ dims ? Val(1) : size(A, d), N)
+    B = similar(A, Dᴮ)
+    C = similar(A, Int, Dᴮ)
+    _vfindmax2!(B, C, A, Dᴮ′)
+    B, CartesianIndices(A)[C]
+end
+
+@generated _vfindmax3!(B::AbstractArray{T, N}, C::AbstractArray{Tₒ, N},
+                       A::AbstractArray{T, N}, dims::D) where {T, Tₒ, N, D} = findmax_quote3(N, D)
+function vfindmax3(A::AbstractArray{T, N}, dims::NTuple{M, Int}) where {T, N, M}
+    Dᴮ = ntuple(d -> d ∈ dims ? 1 : size(A, d), N)
+    Dᴮ′ = ntuple(d -> d ∈ dims ? Val(1) : size(A, d), N)
+    B = similar(A, Dᴮ)
+    C = similar(A, Int, Dᴮ)
+    _vfindmax3!(B, C, A, Dᴮ′)
+    B, CartesianIndices(A)[C]
+end
+
+dims = (2,3)
+@benchmark vfindmax2(A, dims)
+@benchmark vfindmax3(A, dims)
+@benchmark findmax(A, dims=dims)
+n = 4
+A = rand(50, 50, 50, 50);
+A = rand(50, 50, 10000);
+A = rand(10,10,10,10,10,10,10,10);
+
+vfindmax2(A, dims) == vfindmax3(A, dims) == findmax(A, dims=dims)

@@ -109,11 +109,15 @@ end
     lvfindmax_quote(N, D)
 end
 function lvfindmax(A::AbstractArray{T, N}, dims::NTuple{M, Int}) where {T, N, M}
-    Dᴮ′ = ntuple(d -> d ∈ dims ? StaticInt(1) : size(A, d), N)
-    B = similar(A, Dᴮ′)
-    C = similar(B, Int)
-    _lvfindmax!(C, A, B, Dᴮ′)
-    B, CartesianIndices(A)[C]
+    if 1 ∈ dims
+        return bfindmax(A, dims)
+    else
+        Dᴮ′ = ntuple(d -> d ∈ dims ? StaticInt(1) : size(A, d), N)
+        B = similar(A, Dᴮ′)
+        C = similar(B, Int)
+        _lvfindmax!(C, A, B, Dᴮ′)
+        return B, CartesianIndices(A)[C]
+    end
 end
 
 A = rand(4, 3, 5);
@@ -121,7 +125,9 @@ N = ndims(A)
 dims = (2,)
 DD = typeof(ntuple(d -> d ∈ dims ? StaticInt(1) : size(A, d), N))
 lvfindmax_quote(N, DD)
-for d₂ = 2:ndims(A), d₁ = 2:ndims(A)
+for d₂ = 1:ndims(A), d₁ = 1:ndims(A)
     dims = (d₁, d₂)
     @assert lvfindmax(A, dims) == findmax(A, dims=dims)
 end
+@benchmark findmax(A, dims=dims)
+@benchmark lvfindmax(A, dims)
