@@ -23,6 +23,18 @@ function postexpr(N::Int, D)
     Expr(:block, Expr(:(=), b, :m), Expr(:(=), c, :j))
 end
 
+function reduceref(sym::Symbol, N::Int, D)
+    params = D.parameters
+    Expr(:ref, sym, ntuple(d -> params[d] === Val{1} ? 1 : Symbol(:i_, d), N)...)
+end
+function postexpr(sym::Symbol, r, N::Int, D)
+    Expr(:(=), reduceref(sym, N, D), r)
+end
+# # Example
+# ex = partialterm((1,3))
+# push!(ex.args, 1, :Dstar, :j)
+# postexpr(:C, ex, 3, dd)
+
 function maxblock2(N::Int, D)
     params = D.parameters
     a = Expr(:ref, :A, ntuple(d -> Symbol(:i_, d), N)...)
