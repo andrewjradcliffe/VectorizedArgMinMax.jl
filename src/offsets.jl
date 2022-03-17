@@ -27,7 +27,6 @@ totaloffsetraw(N::Int) =
 totaloffset(N::Int) =
     Expr(:(=), :Dstar, Expr(:call, :+, 1, ntuple(d -> Symbol(:D_, ntuple(identity, d)...), N - 1)...))
 
-
 # ∑ₖ₌₁ᴺ(∏ᵢ₌₁ᵏ⁻¹Dᵢ)Iₖ    : I₁ + D₁I₂ + D₁D₂I₃ + ⋯ + D₁D₂⋯Dₖ₋₁Iₖ
 dynamictermraw(N::Int) = Expr(:call, :+, ntuple(d -> d == 1 ? :i_1 :
     Expr(:call, :*, ntuple(i -> Symbol(:D_, i), d - 1)..., Symbol(:i_, d)), N)...)
@@ -92,7 +91,7 @@ function findmax_quote2(N::Int, D)
         $b1
         $b2
         $b3
-        $outer
+        @turbo $outer
     end
 end
 function findmax_quote3(N::Int, D)
@@ -110,7 +109,7 @@ function findmax_quote3(N::Int, D)
         $b1
         $b2
         $b3
-        $outer
+        @turbo $outer
     end
 end
 
@@ -130,8 +129,8 @@ dims = (1,)
 Dᴮ = ntuple(d -> d ∈ dims ? 1 : size(A, d), N)
 Dᴮ′ = ntuple(d -> d ∈ dims ? Val(1) : size(A, d), N)
 T = eltype(A)
-B = similar(A, Int, Dᴮ);
-C = similar(A, Dᴮ);
+B = similar(A, Dᴮ);
+C = similar(A, Int, Dᴮ);
 ex = findmax_quote(N, typeof(Dᴮ′))
 ex2 = findmax_quote2(N, typeof(Dᴮ′))
 ex3 = findmax_quote3(N, typeof(Dᴮ′))
@@ -171,10 +170,15 @@ A = rand(50, 50, 10000);
 A = rand(10,10,10,10,10,10,10,10);
 
 vfindmax2(A, dims) == vfindmax3(A, dims) == findmax(A, dims=dims)
+vargmax3(A, dims) == argmax(A, dims=dims)
+vfindmax3(A, dims)[2] == vargmax3(A, dims)
+
+@benchmark vfindmax2(A, dims)
+@benchmark vfindmax3(A, dims)
 
 ns = [1, 5, 10, 50]
 bs = Matrix{NTuple{3, BenchmarkTools.Trial}}(undef, length(ns), 4);
-for d = 1:4
+for d = 2:4
     for (i, n) ∈ enumerate(ns)
         A = rand(n, 2n, 3n, 4n)
         bs[i, d] = ((@benchmark findmax(A, dims=($d,))),
@@ -188,4 +192,61 @@ ts = map(bs) do b
 end
 tso = map(ts) do t
     getproperty.(t, :time)
+end
+
+
+outer = :(for i_3 = axes(A, 3), i_1 = axes(A, 1)
+              m = typemin(T)
+              j = 0
+              for i_2 = axes(A, 2)
+                  y = A[i_1, i_2, i_3] > m
+                  m = ifelse(y, A[i_1, i_2, i_3], m)
+                  j = ifelse(y, +(D_1 * i_2), j)
+              end
+              B[i_1, 1, i_3] = m
+              C[i_1, 1, i_3] = i_1 + D_12 * i_3 + 1 + Dstar + j
+          end);
+ls = LoopVectorization.LoopSet(outer);
+ops = LoopVectorization.operations(ls)
+LoopVectorization.loopdependencies.(ops)
+@macroexpand @turbo for i_3 = axes(A, 3), i_1 = axes(A, 1)
+    m = typemin(T)
+    j = 0
+    for i_2 = axes(A, 2)
+        y = A[i_1, i_2, i_3] > m
+        m = ifelse(y, A[i_1, i_2, i_3], m)
+        j = ifelse(y, +(D_1 * i_2), j)
+    end
+    B[i_1, 1, i_3] = m
+    C[i_1, 1, i_3] = i_1 + D_12 * i_3 + 1 + Dstar + j
+end
+
+outer = :(for i_3 = axes(A, 3), i_2 = axes(A, 2)
+              m = typemin(T)
+              j = 0
+              for i_1 = axes(A, 1)
+                  y = A[i_1, i_2, i_3] > m
+                  m = ifelse(y, A[i_1, i_2, i_3], m)
+                  j = ifelse(y, i_1, j)
+              end
+              B[1, i_2, i_3] = m
+              C[1, i_2, i_3] = j#D_1 * i_2 + D_12 * i_3 + 1 + Dstar + j
+          end)
+ls = LoopVectorization.LoopSet(outer);
+ops = LoopVectorization.operations(ls)
+LoopVectorization.loopdependencies.(ops)
+ls = LoopVectorization.@turbo_debug for i_3 = axes(A, 3), i_2 = axes(A, 2)
+    m = typemin(T)
+    j = 0
+    for i_1 = axes(A, 1)
+        # j = C[1, i_2, i_3]
+        # m = B[1, i_2, i_3]
+        y = A[i_1, i_2, i_3] > m
+        m = ifelse(y, A[i_1, i_2, i_3], m)
+        j = ifelse(y, i_1, j)
+        # B[1, i_2, i_3] = ifelse(y, A[i_1, i_2, i_3], m)
+        # C[1, i_2, i_3] = ifelse(y, i_1, j)
+    end
+    B[1, i_2, i_3] = m
+    C[1, i_2, i_3] = j#D_1 * i_2 + D_12 * i_3 + 1 + Dstar + j
 end
