@@ -64,3 +64,18 @@ function postexpr3(N::Int, D)
     push!(ex.args, 1, :Dstar, :j)
     Expr(:block, Expr(:(=), b, :m), Expr(:(=), c, ex))
 end
+
+################
+function reduceexpr(OP, N::Int)
+    op = OP.instance
+    a = Expr(:ref, :A, ntuple(d -> Symbol(:i_, d), N)...)
+    Expr(:(=), :s, Expr(:call, Symbol(op), :s, a))
+end
+
+function mapreduceexpr(F, OP, N::Int)
+    f = F.instance
+    op = OP.instance
+    a = Expr(:ref, :A, ntuple(d -> Symbol(:i_, d), N)...)
+    Expr(:(=), :s, Expr(:call, Symbol(op), :s, Expr(:call, Symbol(f), a)))
+end
+

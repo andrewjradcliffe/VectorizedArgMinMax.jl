@@ -250,3 +250,76 @@ ls = LoopVectorization.@turbo_debug for i_3 = axes(A, 3), i_2 = axes(A, 2)
     B[1, i_2, i_3] = m
     C[1, i_2, i_3] = j#D_1 * i_2 + D_12 * i_3 + 1 + Dstar + j
 end
+
+############################################################################################
+#### 2022-03-18: Experiments applying methodology to reduce, mapreduce
+# Alas, performance is worse as the loop ordering is kind of absurd...
+function reduce_quote2(OP, I, N::Int, D)
+    init = I.instance
+    pre = Expr(:block, Expr(:(=), :s, Expr(:call, Symbol(init), :T)))
+    inner = innerloop(N, D)
+    rₑ = reduceexpr(OP, N)
+    push!(inner.args, Expr(:block, rₑ))
+    push!(pre.args, inner)
+    push!(pre.args, postexpr(:B, :s, N, D))
+    outer = outerloop(N, D)
+    push!(outer.args, pre)
+    # outer
+    return quote
+        @turbo $outer
+    end
+end
+
+function mapreduce_quote2(F, OP, I, N::Int, D)
+    init = I.instance
+    pre = Expr(:block, Expr(:(=), :s, Expr(:call, Symbol(init), :T)))
+    inner = innerloop(N, D)
+    rₑ = mapreduceexpr(F, OP, N)
+    push!(inner.args, rₑ)
+    push!(pre.args, inner)
+    push!(pre.args, postexpr(:B, :s, N, D))
+    outer = outerloop(N, D)
+    push!(outer.args, pre)
+    outer
+end
+
+function reduce_quote2(OP, N::Int, D)
+    pre = Expr(:block, Expr(:(=), :s, reduceref(:B, N, D)))
+    inner = innerloop(N, D)
+    rₑ = reduceexpr(OP, N)
+    push!(inner.args, rₑ)
+    push!(pre.args, inner)
+    push!(pre.args, postexpr(:B, :s, N, D))
+    outer = outerloop(N, D)
+    push!(outer.args, pre)
+    outer
+    return quote
+        @turbo $outer
+    end
+end
+
+function _lvreduce2(f, A::AbstractArray{T, N}, dims::NTuple{M, Int}) where {T, N, M}
+    if ntuple(identity, Val(N)) ⊆ dims
+        B = hvncat(ntuple(_ -> 1, Val(N)), true, lvreduce21(f, A))
+    else
+        Dᴮ = ntuple(d -> d ∈ dims ? 1 : size(A, d), Val(N))
+        Dᴮ′ = ntuple(d -> d ∈ dims ? Val(1) : size(A, d), Val(N))
+        B = zeros(Base.promote_op(f, T), Dᴮ)
+        _lvreduce2!(f, zero, B, A, Dᴮ′)
+        # _lvreduce2!(f, B, A, Dᴮ′)
+    end
+    return B
+end
+
+@generated function _lvreduce2!(f::F, init::I, B::AbstractArray{Tₒ, N}, A::AbstractArray{T, N}, dims::D) where {F, I, Tₒ, T, N, D}
+    reduce_quote2(F, I, N, D)
+end
+@generated function _lvreduce2!(f::F, B::AbstractArray{Tₒ, N}, A::AbstractArray{T, N}, dims::D) where {F, Tₒ, T, N, D}
+    reduce_quote2(F, I, N, D)
+end
+
+@benchmark _lvreduce2(+, A, (1,2))
+@benchmark lvsum(A, dims=(1,2,))
+@benchmark vsum(A, dims=(1,2))
+_lvreduce2(+, A, (1,2)) == lvsum(A, dims=(1,2)) == vsum(A, dims=(1,2))
+
