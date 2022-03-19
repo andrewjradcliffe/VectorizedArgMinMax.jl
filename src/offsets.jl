@@ -407,3 +407,21 @@ lvsum3(A, dims) = _lvreduce3(+, zero, A, dims)
 @benchmark lvsum(A, dims=(1,3), multithreaded=false)
 @benchmark vsum(A, dims=(1,3), multithreaded=false)
 _lvreduce3(+, zero, A, (1,3)) == lvsum(A, dims=(1,3))
+
+function _lvsum4(A::AbstractArray{T, N}, dims::NTuple{M, Int}) where {T, N, M}
+    Dᴮ′ = ntuple(d -> d ∈ dims ? StaticInt(1) : size(A, d), Val(N))
+    B = similar(A, Base.promote_op(+, T), Dᴮ′)
+    _lvsum4!(B, A, Dᴮ′)
+end
+function sum_quote(N::Int, D)
+    params = D.parameters
+    rinds = Int[]
+    for d = 1:N
+        params[d] === Static.One && push!(rinds, d)
+    end
+    return VectorizedStatistics.staticdim_sum_quote(rinds, N)
+end
+@generated _lvsum4!(B, A::AbstractArray{T, N}, dims::D) where {T, N, D} = sum_quote(N, D)
+
+
+@benchmark _lvsum4(A, (1,3))
