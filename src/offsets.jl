@@ -323,3 +323,87 @@ end
 @benchmark vsum(A, dims=(1,2))
 _lvreduce2(+, A, (1,2)) == lvsum(A, dims=(1,2)) == vsum(A, dims=(1,2))
 
+############################################################################################
+#### Interesting experiment using indices
+ex = VectorizedStatistics.staticdim_mean_quote([1,3], 4)
+Meta.show_sexpr(ex)
+D = typeof((StaticInt(1), 10, StaticInt(1), 10))
+N = 4
+function reduce_quote3(OP, I, N::Int, D)
+    _params = D.parameters
+    a = Expr(:ref, :A, ntuple(d -> Symbol(:i_, d), N)...)
+    bᵥ = Expr(:call, :view, :B)
+    bᵥ′ = Expr(:ref, :Bᵥ)
+    rinds = Int[]
+    nrinds = Int[]
+    for d = 1:N
+        if _params[d] === Static.One
+            push!(bᵥ.args, Expr(:call, :firstindex, :B, d))
+            push!(rinds, d)
+        else
+            push!(bᵥ.args, Expr(:call, :Colon))
+            push!(nrinds, d)
+            push!(bᵥ′.args, Symbol(:i_, d))
+        end
+    end
+    bᵥ = Expr(:(=), :Bᵥ, bᵥ)
+    sort!(rinds, rev=true)
+    sort!(nrinds, rev=true)
+    block = Expr(:block)
+    loops = Expr(:for, Expr(:(=), Symbol(:i_, nrinds[1]),
+                            Expr(:call, :indices, Expr(:tuple, :A, :B), nrinds[1])), block)
+    for i = 2:length(nrinds)
+        newblock = Expr(:block)
+        push!(block.args,
+              Expr(:for, Expr(:(=), Symbol(:i_, nrinds[i]),
+                              Expr(:call, :indices, Expr(:tuple, :A, :B), nrinds[i])), newblock))
+        block = newblock
+    end
+    rblock = block
+    # Push to before reduction loop
+    pre = Expr(:(=), :ξ, Expr(:call, Symbol(I.instance), Expr(:call, :eltype, :Bᵥ)))
+    push!(rblock.args, pre)
+    # Reduction loop
+    for i = 1:length(rinds)
+        newblock = Expr(:block)
+        push!(block.args,
+              Expr(:for, Expr(:(=), Symbol(:i_, rinds[i]),
+                              Expr(:call, :axes, :A, rinds[i])), newblock))
+        block = newblock
+    end
+    # Push to inside innermost loop
+    reduction = Expr(:(=), :ξ, Expr(:call, Symbol(OP.instance), :ξ, a))
+    push!(block.args, reduction)
+    # Push to after reduction loop
+    post = Expr(:(=), bᵥ′, :ξ)
+    push!(rblock.args, post)
+    return quote
+        $bᵥ
+        @turbo $loops
+        return B
+    end
+end
+
+reduce_quote3(typeof(max), typeof(typemin), N, D)
+
+function _lvreduce3(op, init, A::AbstractArray{T, N}, dims::NTuple{M, Int}) where {T, N, M}
+    if ntuple(identity, Val(N)) ⊆ dims
+        B = hvncat(ntuple(_ -> 1, Val(N)), true, lvreduce1(op, A))
+    else
+        Dᴮ′ = ntuple(d -> d ∈ dims ? StaticInt(1) : size(A, d), Val(N))
+        B = similar(A, Base.promote_op(op, T), Dᴮ′)
+        _lvreduce3!(op, init, B, A, Dᴮ′)
+    end
+    return B
+end
+
+@generated function _lvreduce3!(op::OP, init::I, B::AbstractArray{Tₒ, N}, A::AbstractArray{T, N}, dims::D) where {OP, I, Tₒ, T, N, D}
+    reduce_quote3(OP, I, N, D)
+end
+
+lvsum3(A, dims) = _lvreduce3(+, zero, A, dims)
+@benchmark _lvreduce3(+, zero, A, (1,3))
+@benchmark lvsum3(A, (1,3))
+@benchmark lvsum(A, dims=(1,3), multithreaded=false)
+@benchmark vsum(A, dims=(1,3), multithreaded=false)
+_lvreduce3(+, zero, A, (1,3)) == lvsum(A, dims=(1,3))
