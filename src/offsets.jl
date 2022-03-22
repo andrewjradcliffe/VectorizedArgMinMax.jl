@@ -44,6 +44,17 @@ partialterm(J::NTuple{N, Int}) where {N} =
     Expr(:call, :+, ntuple(d -> J[d] == 1 ? :i_1 :
     Expr(:call, :*, Symbol(:D_, ntuple(identity, J[d] - 1)...), Symbol(:i_, J[d])), N)...)
 
+partialtermrawj(J::NTuple{N, Int}) where {N} =
+    Expr(:call, :+, ntuple(d -> J[d] == 1 ? :j_1 :
+    Expr(:call, :*, ntuple(i -> Symbol(:D_, i), J[d] - 1)..., Symbol(:j_, J[d])), N)...)
+
+singletermraw(k::Int) = k == 1 ? :i_1 :
+    Expr(:call, :*, ntuple(i -> Symbol(:D_, i), k - 1)..., Symbol(:i_, k))
+singletermrawj(k::Int) = k == 1 ? :j_1 :
+    Expr(:call, :*, ntuple(i -> Symbol(:D_, i), k - 1)..., Symbol(:j_, k))
+singleterm(k::Int) = k == 1 ? :i_1 :
+    Expr(:call, :*, Symbol(:D_, ntuple(identity, k - 1)...), Symbol(:i_, k))
+
 function preexprmax(J::NTuple{N, Int}) where {N}
     block = Expr(:block, Expr(:(=), :m, Expr(:call, :typemin, :T)))
     ex = partialterm(J)
@@ -341,7 +352,8 @@ function reduce_quote3(OP, I, N::Int, D)
             push!(bᵥ.args, Expr(:call, :firstindex, :B, d))
             push!(rinds, d)
         else
-            push!(bᵥ.args, Expr(:call, :Colon))
+            # push!(bᵥ.args, Expr(:call, :Colon))
+            push!(bᵥ.args, :)
             push!(nrinds, d)
             push!(bᵥ′.args, Symbol(:i_, d))
         end
@@ -379,14 +391,17 @@ function reduce_quote3(OP, I, N::Int, D)
     push!(rblock.args, post)
     return quote
         $bᵥ
-        @turbo $loops
+        @tturbo $loops
         return B
     end
 end
 
 reduce_quote3(typeof(max), typeof(typemin), N, D)
+Dᴮ′ = ntuple(d -> d ∈ dims ? StaticInt(1) : size(A, d), N)
+D = typeof(Dᴮ′)
+reduce_quote3(typeof(+), typeof(zero), N, D)
 
-function _lvreduce3(op, init, A::AbstractArray{T, N}, dims::NTuple{M, Int}) where {T, N, M}
+function _lvreduce3(op::OP, init::I, A::AbstractArray{T, N}, dims::NTuple{M, Int}) where {OP, I, T, N, M}
     if ntuple(identity, Val(N)) ⊆ dims
         B = hvncat(ntuple(_ -> 1, Val(N)), true, lvreduce1(op, A))
     else
@@ -425,3 +440,75 @@ end
 
 
 @benchmark _lvsum4(A, (1,3))
+
+function mapreduce_quote3(F, OP, I, N::Int, D)
+    _params = D.parameters
+    a = Expr(:ref, :A, ntuple(d -> Symbol(:i_, d), N)...)
+    bᵥ = Expr(:call, :view, :B)
+    bᵥ′ = Expr(:ref, :Bᵥ)
+    rinds = Int[]
+    nrinds = Int[]
+    for d = 1:N
+        if _params[d] === Static.One
+            push!(bᵥ.args, Expr(:call, :firstindex, :B, d))
+            push!(rinds, d)
+        else
+            # push!(bᵥ.args, Expr(:call, :Colon))
+            push!(bᵥ.args, :)
+            push!(nrinds, d)
+            push!(bᵥ′.args, Symbol(:i_, d))
+        end
+    end
+    bᵥ = Expr(:(=), :Bᵥ, bᵥ)
+    sort!(rinds, rev=true)
+    sort!(nrinds, rev=true)
+    block = Expr(:block)
+    loops = Expr(:for, Expr(:(=), Symbol(:i_, nrinds[1]),
+                            Expr(:call, :indices, Expr(:tuple, :A, :B), nrinds[1])), block)
+    for i = 2:length(nrinds)
+        newblock = Expr(:block)
+        push!(block.args,
+              Expr(:for, Expr(:(=), Symbol(:i_, nrinds[i]),
+                              Expr(:call, :indices, Expr(:tuple, :A, :B), nrinds[i])), newblock))
+        block = newblock
+    end
+    rblock = block
+    # Push to before reduction loop
+    pre = Expr(:(=), :ξ, Expr(:call, Symbol(I.instance), Expr(:call, :eltype, :Bᵥ)))
+    push!(rblock.args, pre)
+    # Reduction loop
+    for i = 1:length(rinds)
+        newblock = Expr(:block)
+        push!(block.args,
+              Expr(:for, Expr(:(=), Symbol(:i_, rinds[i]),
+                              Expr(:call, :axes, :A, rinds[i])), newblock))
+        block = newblock
+    end
+    # Push to inside innermost loop
+    reduction = Expr(:(=), :ξ, Expr(:call, Symbol(OP.instance), :ξ,
+                                    Expr(:call, Symbol(F.instance), a)))
+    push!(block.args, reduction)
+    # Push to after reduction loop
+    post = Expr(:(=), bᵥ′, :ξ)
+    push!(rblock.args, post)
+    return quote
+        $bᵥ
+        @tturbo $loops
+        return B
+    end
+end
+
+function _lvmapreduce3(f::F, op::OP, init::I, A::AbstractArray{T, N}, dims::NTuple{M, Int}) where {F, OP, I, T, N, M}
+    if ntuple(identity, Val(N)) ⊆ dims
+        B = hvncat(ntuple(_ -> 1, Val(N)), true, lvmapreduce1(f, op, A))
+    else
+        Dᴮ′ = ntuple(d -> d ∈ dims ? StaticInt(1) : size(A, d), Val(N))
+        B = similar(A, Base.promote_op(op, Base.promote_op(f, T)), Dᴮ′)
+        _lvmapreduce3!(f, op, init, B, A, Dᴮ′)
+    end
+    return B
+end
+
+@generated function _lvmapreduce3!(f::F, op::OP, init::I, B::AbstractArray{Tₒ, N}, A::AbstractArray{T, N}, dims::D) where {F, OP, I, Tₒ, T, N, D}
+    mapreduce_quote3(F, OP, I, N, D)
+end
