@@ -25,7 +25,7 @@ function findmax_loops_innerturbo(N::Int, D, multithreaded::Bool)
     outer
 end
 
-function findmax_quote(N::Int, D)
+function bfindmax_quote(N::Int, D)
     b1 = sizeblock(N)
     b2 = Expr(:block, ntuple(d -> offsetk(d + 2), N - 2)...)
     b3 = Expr(:block, totaloffsetraw(N), Expr(:(=), :Dstar, Expr(:call, :-, :Dstar)))
@@ -89,7 +89,7 @@ function vtfindmax_quote(N::Int, D)
 end
 
 @generated _bfindmax!(B::AbstractArray{T, N}, C::AbstractArray{Tₒ, N},
-                      A::AbstractArray{T, N}, dims::D) where {T, Tₒ, N, D} = findmax_quote(N, D)
+                      A::AbstractArray{T, N}, dims::D) where {T, Tₒ, N, D} = bfindmax_quote(N, D)
 function bfindmax(A::AbstractArray{T, N}, dims::NTuple{M, Int}) where {T, N, M}
     Dᴮ = ntuple(d -> d ∈ dims ? 1 : size(A, d), N)
     Dᴮ′ = ntuple(d -> d ∈ dims ? Val(1) : size(A, d), N)
